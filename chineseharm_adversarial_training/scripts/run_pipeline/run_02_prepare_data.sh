@@ -13,7 +13,7 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$SCRIPT_DIR"
 
-BASE_DIR="/home/ma-user/work/test"
+BASE_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 ORIGIN_DATA="$BASE_DIR/origin_data"
 SPLIT_DATA="$BASE_DIR/split_data"
 PREPARED_DATA="$BASE_DIR/prepared_data"

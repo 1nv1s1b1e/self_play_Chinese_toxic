@@ -19,7 +19,7 @@ cd "$SCRIPT_DIR"
 
 # BASE_DIR = 仓库根目录 (chineseharm_adversarial_training 的上一级)
 # 所有 pipeline 脚本用 $BASE_DIR/prepared_data, $BASE_DIR/split_data 等
-BASE_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+BASE_DIR="$SCRIPT_DIR"
 
 CORRECTED_DIR="$SCRIPT_DIR/corrected_data"
 PREPARED_DIR="$BASE_DIR/prepared_data"

@@ -39,7 +39,7 @@ export TASK_QUEUE_ENABLE=1
 # ─────────────────────────────────────────────────────────────────────────────────
 # 3. 训练超参数
 # ─────────────────────────────────────────────────────────────────────────────────
-BASE_DIR="${BASE_DIR:-/home/ma-user/work/test}"
+BASE_DIR="${BASE_DIR:-$(cd "$SCRIPT_DIR/../.." && pwd)}"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 MODEL_SIZE="${MODEL_SIZE:-3B}"

@@ -8,7 +8,7 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$SCRIPT_DIR"
 
-BASE_DIR="/home/ma-user/work/test"
+BASE_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 MODELS_BASE="$BASE_DIR/models_base/Qwen"
 LORA_DIR="$BASE_DIR/lora_models_toxicn"
 MERGED_DIR="$BASE_DIR/merged_models_toxicn"

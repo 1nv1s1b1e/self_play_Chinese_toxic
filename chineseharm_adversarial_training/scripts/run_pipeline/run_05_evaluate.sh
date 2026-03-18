@@ -9,7 +9,7 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$SCRIPT_DIR"
 
-BASE_DIR="/home/ma-user/work/test"
+BASE_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 MODELS_BASE="$BASE_DIR/models_base/Qwen"
 MERGED_DIR="$BASE_DIR/merged_models_toxicn"
 TEST_DATA="$BASE_DIR/prepared_data/rl/test_eval.json"

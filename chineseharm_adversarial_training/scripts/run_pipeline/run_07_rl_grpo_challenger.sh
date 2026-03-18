@@ -10,7 +10,7 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$SCRIPT_DIR"
 
-BASE_DIR="${BASE_DIR:-/home/ma-user/work/test}"
+BASE_DIR="${BASE_DIR:-$(cd "$SCRIPT_DIR/../.." && pwd)}"
 
 # 解析参数
 MODEL_SIZE="${MODEL_SIZE:-3B}"

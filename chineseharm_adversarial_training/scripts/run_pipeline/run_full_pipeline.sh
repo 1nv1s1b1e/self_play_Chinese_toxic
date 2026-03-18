@@ -23,7 +23,7 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$SCRIPT_DIR"
 
-BASE_DIR="/home/ma-user/work/test"
+BASE_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 MODEL_SIZE="${MODEL_SIZE:-3B}"
 N_DEVICES="${N_DEVICES:-4}"
 N_GPUS="${N_GPUS:-4}"
