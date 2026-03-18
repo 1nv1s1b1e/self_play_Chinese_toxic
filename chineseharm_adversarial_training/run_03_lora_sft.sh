@@ -131,7 +131,7 @@ for SIZE in "${MODEL_SIZES[@]}"; do
         if [ "$FORCE_RETRAIN" -eq 0 ] && [ -f "$CHALLENGER_OUT/adapter_config.json" ]; then
             echo "✅ Challenger ${SIZE} 已完成训练，跳过 (设置 FORCE_RETRAIN=1 可强制重训)"
         else
-            $LAUNCH_CMD ../model_lora/train_challenger_lora.py \
+            $LAUNCH_CMD scripts/model_lora/train_challenger_lora.py \
         --model_path "$MODEL_PATH" \
         --data_path "$DATA_DIR/challenger_sft/train.jsonl" \
         --val_data_path "$DATA_DIR/challenger_sft/val.jsonl" \
@@ -164,7 +164,7 @@ for SIZE in "${MODEL_SIZES[@]}"; do
     if [ "$FORCE_RETRAIN" -eq 0 ] && [ -f "$REVIEWER_OUT/adapter_config.json" ]; then
         echo "✅ Reviewer ${SIZE} 已完成训练，跳过 (设置 FORCE_RETRAIN=1 可强制重训)"
     else
-        $LAUNCH_CMD ../model_lora/train_reviewer_lora.py \
+        $LAUNCH_CMD scripts/model_lora/train_reviewer_lora.py \
         --model_path "$MODEL_PATH" \
         --data_path "$DATA_DIR/reviewer_sft/train.jsonl" \
         --val_data_path "$DATA_DIR/reviewer_sft/val.jsonl" \

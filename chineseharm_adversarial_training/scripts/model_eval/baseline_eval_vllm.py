@@ -179,27 +179,31 @@ def evaluate_with_vllm(
     formatted_prompts = []
     true_labels = []
     
+    all_labels_list = []
+
     for item in data:
         text = item['文本']
         true_label = item['标签']
-        
+        all_labels = item.get('all_labels', [true_label])
+
         # 官方格式prompt
         prompt_content = create_prompt(text)
-        
+
         # 使用chat template
         messages = [
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": prompt_content}
         ]
-        
+
         formatted_text = tokenizer.apply_chat_template(
             messages,
             tokenize=False,
             add_generation_prompt=True
         )
-        
+
         formatted_prompts.append(formatted_text)
         true_labels.append(true_label)
+        all_labels_list.append(all_labels)
     
     print(f"✓ 准备完成: {len(formatted_prompts)} prompts")
     
@@ -225,8 +229,9 @@ def evaluate_with_vllm(
         pred = pred_full["category"]
         pred_binary = pred_full["binary"]
         
-        # 判断正确性
-        is_correct = (pred == true_label) if pred else False
+        # 判断正确性（多标签样本命中 all_labels 中任一即算正确）
+        all_labels = all_labels_list[i]
+        is_correct = (pred in all_labels) if pred else False
         
         if is_correct:
             correct += 1
@@ -274,11 +279,12 @@ def evaluate_with_vllm(
     
     for i, output in enumerate(outputs):
         true_label = true_labels[i]
+        all_labels = all_labels_list[i]
         response = output.outputs[0].text.strip()
         pred = extract_prediction(response)
         if pred is None:
             label_stats[true_label]["FN"] += 1
-        elif pred == true_label:
+        elif pred in all_labels:
             label_stats[true_label]["TP"] += 1
         else:
             label_stats[pred]["FP"] += 1
@@ -451,10 +457,13 @@ def load_eval_data(data_path: str):
         df = pd.read_parquet(data_path)
         data = []
         for _, row in df.iterrows():
-            data.append(normalize_record({
+            rec = normalize_record({
                 "文本": row.get("original_text", row.get("文本", row.get("content", ""))),
                 "标签": row.get("category", row.get("标签", ""))
-            }))
+            })
+            if "all_labels" in row and row["all_labels"] is not None:
+                rec["all_labels"] = row["all_labels"]
+            data.append(rec)
         return data
     elif data_path.endswith('.jsonl'):
         data = []
