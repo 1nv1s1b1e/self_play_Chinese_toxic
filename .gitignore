@@ -1,0 +1,52 @@
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+*.egg
+
+# Wrong labels backups
+*.bak_wrong_labels
+
+# Temporary results
+tmp_results/
+tmp_results2/
+tmp_results3/
+
+# Empty model directories (will be created at runtime)
+chineseharm_adversarial_training/lora_models/
+chineseharm_adversarial_training/lora_models_toxicn/
+chineseharm_adversarial_training/merged_models_toxicn/
+chineseharm_adversarial_training/eval_reuslts/
+
+# IDE / editor
+.vscode/
+.idea/
+
+# Agent config
+.agent/
+
+# Claude config
+.claude/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Model weights (safety net)
+*.pt
+*.pth
+*.bin
+*.safetensors
+**/checkpoints/
+
+# Misc
+*.log
+kernel_meta/
+.deps/
+cmake-build-*/

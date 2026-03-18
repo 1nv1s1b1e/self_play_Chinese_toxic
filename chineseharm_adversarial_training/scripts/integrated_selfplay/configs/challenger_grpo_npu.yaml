@@ -1,0 +1,86 @@
+# =============================================================================
+# verl GRPO 训练配置 — Challenger (昇腾 910B 单机多卡) (集成版)
+# =============================================================================
+# 用法 (以 run_grpo_challenger_npu.sh 调用为主，此 YAML 为备用配置方式):
+#   python3 -m verl.trainer.main_ppo --config-path /path/to/configs \
+#           --config-name challenger_grpo_npu \
+#           actor_rollout_ref.model.path=/your/model \
+#           data.train_files=/your/data.parquet \
+#           trainer.n_gpus_per_node=2
+#
+# 注意:
+#   - trainer.device=npu 激活昇腾 NPU 支持
+#   - rollout.name=vllm-ascend 使用昇腾适配的 vllm 推理后端
+#   - actor.strategy=fsdp 使用全切片数据并行
+#   - 集成版使用 challenger_reward.py (逐样本真对抗信号, Plan 1)
+# =============================================================================
+
+algorithm:
+  adv_estimator: grpo
+  kl_ctrl:
+    kl_coef: 0.001
+
+data:
+  train_files: ???
+  val_files: ???
+  train_batch_size: 64
+  max_prompt_length: 512
+  max_response_length: 256
+  filter_overlong_prompts: true
+  truncation: error
+
+actor_rollout_ref:
+  model:
+    path: ???
+    enable_gradient_checkpointing: true
+    use_remove_padding: false
+
+  actor:
+    strategy: fsdp
+    optim:
+      lr: 5.0e-7
+      lr_scheduler: cosine
+      warmup_steps: 10
+    entropy_coeff: 0.001
+    ppo_mini_batch_size: 16
+    ppo_micro_batch_size_per_gpu: 2
+    use_kl_loss: true
+    kl_loss_coef: 0.001
+    kl_loss_type: low_var_kl
+    fsdp_config:
+      param_offload: false
+      optimizer_offload: false
+
+  rollout:
+    name: vllm-ascend
+    n: 8
+    temperature: 1.0
+    top_p: 0.95
+    log_prob_micro_batch_size_per_gpu: 4
+    enable_chunked_prefill: false
+    tensor_model_parallel_size: 2
+    gpu_memory_utilization: 0.6
+
+  ref:
+    strategy: fsdp
+    log_prob_micro_batch_size_per_gpu: 4
+    fsdp_config:
+      param_offload: true
+
+custom_reward_function:
+  path: ???                     # challenger_reward.py 绝对路径 (集成版逐样本真对抗)
+  name: compute_score
+
+trainer:
+  device: npu
+  n_gpus_per_node: 2
+  nnodes: 1
+  critic_warmup: 0
+  logger: console
+  project_name: chineseharm_adversarial
+  experiment_name: challenger_grpo_integrated
+  save_freq: 1
+  test_freq: 1
+  total_epochs: 3
+  default_hdfs_dir: null
+  default_local_dir: ???

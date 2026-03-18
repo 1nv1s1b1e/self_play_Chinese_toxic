@@ -1,0 +1,68 @@
+{
+  "total": 12011,
+  "label_distribution": {
+    "无毒": 5550,
+    "性别歧视": 2302,
+    "种族歧视": 1303,
+    "地域偏见": 1161,
+    "其他仇恨": 984,
+    "LGBTQ歧视": 711
+  },
+  "expression_distribution": {
+    "non-hate": 6366,
+    "explicit": 2737,
+    "implicit": 1995,
+    "reporting": 913
+  },
+  "cross_table": {
+    "explicit": {
+      "LGBTQ歧视": 386,
+      "其他仇恨": 70,
+      "地域偏见": 220,
+      "性别歧视": 1259,
+      "种族歧视": 802
+    },
+    "implicit": {
+      "LGBTQ歧视": 232,
+      "其他仇恨": 80,
+      "地域偏见": 341,
+      "性别歧视": 887,
+      "种族歧视": 455
+    },
+    "non-hate": {
+      "LGBTQ歧视": 0,
+      "其他仇恨": 816,
+      "地域偏见": 0,
+      "性别歧视": 0,
+      "种族歧视": 0
+    },
+    "reporting": {
+      "LGBTQ歧视": 93,
+      "其他仇恨": 18,
+      "地域偏见": 600,
+      "性别歧视": 156,
+      "种族歧视": 46
+    }
+  },
+  "hard_samples": {
+    "implicit": 1995,
+    "reporting": 913,
+    "total_hard": 2908,
+    "hard_percentage": 24.2
+  },
+  "description": "ToxiCN → 6分类 转换报告",
+  "source": "JunyuLu/ToxiCN (ACL 2023)",
+  "categories": [
+    "性别歧视",
+    "种族歧视",
+    "地域偏见",
+    "LGBTQ歧视",
+    "其他仇恨",
+    "无毒"
+  ],
+  "conversion_rules": {
+    "multi_label_strategy": "按优先级取第一个匹配: Sexism > Racism > Region > LGBTQ > Others",
+    "non_toxic_rule": "toxic=0 → 无毒",
+    "fallback_rule": "toxic=1 但无特定target → 其他仇恨"
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "description": "一站式数据准备报告",
+  "data_strategy": {
+    "principle": "train全部用于SFT冷启动 + RL种子池",
+    "reason": [
+      "SFT教会模型基础能力(生成/分类)",
+      "RL通过对抗博弈优化策略，训练数据是Challenger新生成的对抗文本",
+      "种子池只是采样起点，不等于RL训练数据",
+      "论文叙事清晰: 同数据下RL vs SFT的对比"
+    ]
+  },
+  "data_usage": {
+    "train (6654)": {
+      "challenger_sft": "4425 条 (排除无毒)",
+      "reviewer_sft": "8160 条 (含无毒)",
+      "rl_seed_pool": "8160 条"
+    },
+    "val (1426)": "RL过程评估 + SFT验证",
+    "test (1427)": "最终评测 (不参与任何训练)"
+  },
+  "output_files": {
+    "challenger_sft/": "Challenger冷启动训练数据 (category→text)",
+    "reviewer_sft/": "Reviewer冷启动训练数据 (text→category)",
+    "rl/train_seed.parquet": "RL种子池 (列名: original_text, category)",
+    "rl/val_eval.parquet": "RL过程评估",
+    "rl/test_eval.parquet": "最终评测"
+  },
+  "column_mapping": {
+    "SFT数据": "instruction/output格式 (适配LLaMA-Factory等)",
+    "RL数据": "original_text/category (适配adversarial_grpo_trainer.py)"
+  }
+}

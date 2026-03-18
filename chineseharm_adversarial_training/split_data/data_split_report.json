@@ -1,0 +1,28 @@
+{
+  "description": "仓库标准数据转换报告",
+  "source": {
+    "train_json": "C:\\vscode_project\\final_chineseharm_self-play\\train.json",
+    "test_json": "C:\\vscode_project\\final_chineseharm_self-play\\test.json"
+  },
+  "output": {
+    "train": 8160,
+    "val": 1440,
+    "test": 2411
+  },
+  "field_mapping": {
+    "content → 文本": "原始文本",
+    "topic+toxic+toxic_type → 标签": "6类中文标签",
+    "toxic_type → toxic_type_label": "无毒/一般攻击性/仇恨言论",
+    "expression → expression_label": "非仇恨/显式仇恨/隐式仇恨/转述"
+  },
+  "category_mapping": {
+    "toxic==0": "无毒",
+    "toxic==1, toxic_type==1": "其他仇恨 (一般攻击性)",
+    "toxic==1, toxic_type==2, topic=gender": "性别歧视",
+    "toxic==1, toxic_type==2, topic=race": "种族歧视",
+    "toxic==1, toxic_type==2, topic=region": "地域偏见",
+    "toxic==1, toxic_type==2, topic=lgbt": "LGBTQ歧视"
+  },
+  "seed": 42,
+  "val_ratio": 0.15
+}

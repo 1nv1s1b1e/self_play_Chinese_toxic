@@ -1,0 +1,9 @@
+FAIL line 463: unterminated triple-quoted string literal (detected at line 761)
+459: '    返回的 DataFrame 列:'
+460: '      prompt       : list[dict]  实ChallengerSystem+User 消息'
+461: '      reward_model : dict        Verifier 确认后的 ground_truth'
+462: '      extra_info   : dict        verifier_result (用于 reward function)'
+463: '    """'
+464: '    rows = []'
+465: '    for i, (task, gen_text) in enumerate(zip(tasks, generated_texts)):'
+466: '        if not gen_text or len(gen_text.strip()) < 3:'
