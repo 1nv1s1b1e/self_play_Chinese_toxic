@@ -4,7 +4,7 @@
 # =============================================================================
 # 用法:
 #   cd /home/ma-user/work/test/chineseharm_adversarial_training
-#   bash run_full_pipeline.sh
+#   bash scripts/run_pipeline/run_full_pipeline.sh
 #
 # 环境变量 (可覆盖):
 #   N_DEVICES=4        NPU 卡数 (SFT阶段)
@@ -65,7 +65,7 @@ echo ""
 # 检查基础模型
 if [ ! -d "$MODEL_PATH" ]; then
     echo "❌ 基础模型不存在: $MODEL_PATH"
-    echo "   请先运行: bash scripts/run_pipeline/run_01_download.sh"
+    echo "   请先运行: bash run_01_download.sh"
     exit 1
 fi
 
@@ -117,7 +117,7 @@ if [ "$SKIP_SFT" -eq 0 ]; then
     CHALLENGER_OUT="$LORA_DIR/challenger_${MODEL_SIZE}"
     mkdir -p "$CHALLENGER_OUT"
 
-    $LAUNCH_CMD scripts/model_lora/train_challenger_lora.py \
+    $LAUNCH_CMD ../model_lora/train_challenger_lora.py \
         --model_path "$MODEL_PATH" \
         --data_path "$PREPARED_DATA/challenger_sft/train.jsonl" \
         --val_data_path "$PREPARED_DATA/challenger_sft/val.jsonl" \
@@ -142,7 +142,7 @@ if [ "$SKIP_SFT" -eq 0 ]; then
     REVIEWER_OUT="$LORA_DIR/reviewer_${MODEL_SIZE}"
     mkdir -p "$REVIEWER_OUT"
 
-    $LAUNCH_CMD scripts/model_lora/train_reviewer_lora.py \
+    $LAUNCH_CMD ../model_lora/train_reviewer_lora.py \
         --model_path "$MODEL_PATH" \
         --data_path "$PREPARED_DATA/reviewer_sft/train.jsonl" \
         --val_data_path "$PREPARED_DATA/reviewer_sft/val.jsonl" \
@@ -185,7 +185,7 @@ if [ "$SKIP_MERGE" -eq 0 ]; then
         fi
 
         echo "  合并 ${ROLE}_${MODEL_SIZE}..."
-        python scripts/model_lora/merge_lora.py \
+        python ../model_lora/merge_lora.py \
             --base_model "$MODEL_PATH" \
             --lora_path "$LORA_PATH" \
             --output_path "$OUTPUT_PATH" \
@@ -220,7 +220,7 @@ if [ "$SKIP_EVAL" -eq 0 ]; then
 
     # ── 3a. Baseline: 原始 Qwen2.5 base (未微调) ──
     echo "────── [Baseline] Qwen2.5-${MODEL_SIZE}-Instruct (未微调) ──────"
-    python scripts/model_eval/batch_eval_npu.py \
+    python ../model_eval/batch_eval_npu.py \
         --model_path "$MODEL_PATH" \
         --data_path "$TEST_DATA" \
         --output_dir "$EVAL_DIR" \
@@ -235,7 +235,7 @@ if [ "$SKIP_EVAL" -eq 0 ]; then
     REVIEWER_MERGED="$MERGED_DIR/reviewer_${MODEL_SIZE}"
     if [ -d "$REVIEWER_MERGED" ]; then
         echo "────── [Reviewer SFT] reviewer_${MODEL_SIZE} ──────"
-        python scripts/model_eval/batch_eval_npu.py \
+        python ../model_eval/batch_eval_npu.py \
             --model_path "$REVIEWER_MERGED" \
             --data_path "$TEST_DATA" \
             --output_dir "$EVAL_DIR" \
@@ -317,7 +317,7 @@ if [ "$SKIP_SELFPLAY" -eq 0 ]; then
     TOTAL_STEPS="${TOTAL_STEPS:-50}" \
     CHECK_INTERVAL="${CHECK_INTERVAL:-10}" \
     RESUME=1 \
-    bash scripts/integrated_selfplay/run_selfplay.sh
+    bash ../integrated_selfplay/run_selfplay.sh
 
     echo ""
     echo "✓ Self-Play 训练完成"
