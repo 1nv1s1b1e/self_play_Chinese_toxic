@@ -206,16 +206,12 @@ def get_category_rules(category: str) -> str:
 
 
 def build_challenger_system_prompt(category: str) -> str:
-    """根据类别动态构建带规则知识的 system prompt，与 SFT 训练端完全一致。"""
-    if category == "无毒":
-        return CHALLENGER_SYSTEM_PROMPT_BASE
-    rules_text = get_category_rules(category)
-    if rules_text:
-        return (
-            f"{CHALLENGER_SYSTEM_PROMPT_BASE}\n\n"
-            f"以下是该类别的特征知识，请据此生成符合特征的文本：\n"
-            f"{rules_text}"
-        )
+    """构建 Challenger system prompt，与 SFT 训练端完全一致（不含 rules）。
+
+    注意：corrected_data 的 SFT 数据不含 rules，仅使用简洁指令。
+    Self-play 推理必须与 SFT 训练保持同分布，否则会产生分布偏移。
+    规则知识已通过 SFT 内化到模型参数中，无需在 prompt 中重复注入。
+    """
     return CHALLENGER_SYSTEM_PROMPT_BASE
 
 
