@@ -136,15 +136,18 @@ val_df   = pd.read_parquet(os.path.join(split_dir, "val.parquet"))
 test_df  = pd.read_parquet(os.path.join(split_dir, "test.parquet"))
 
 # ── 生成 train_seed / val_eval / test_eval ──
-# 格式: 简单表格 [{文本, 标签, toxic_type_label, expression_label}, ...]
+# 格式: 简单表格 [{文本, 标签, all_labels, toxic_type_label, expression_label}, ...]
+# all_labels: 多标签列表，评估时模型预测命中其中任一即算正确
 # generate_dynamic_data.py 的 build_sampling_tasks() 直接读这些列
 for split, df, name in [
     ("train", train_df, "train_seed"),
     ("val",   val_df,   "val_eval"),
     ("test",  test_df,  "test_eval"),
 ]:
-    # 只保留需要的列
-    out_df = df[["文本", "标签", "toxic_type_label", "expression_label"]].copy()
+    keep_cols = ["文本", "标签", "toxic_type_label", "expression_label"]
+    if "all_labels" in df.columns:
+        keep_cols.insert(2, "all_labels")
+    out_df = df[keep_cols].copy()
 
     # JSON (用于评估脚本 batch_eval_npu_vllm.py 等)
     json_path = os.path.join(rl_dir, f"{name}.json")

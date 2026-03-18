@@ -221,15 +221,16 @@ def calculate_metrics(results):
     
     for item in results:
         true_label = item["标签"]
+        all_labels = item.get("all_labels", [true_label])
         pred_label = item["predict_label"]
-        
+
         total += 1
-        
+
         if pred_label is None:
             failed_extractions += 1
             # 将None视为FN
             label_stats[true_label]['FN'] += 1
-        elif pred_label == true_label:
+        elif pred_label in all_labels:
             correct += 1
             label_stats[true_label]['TP'] += 1
         else:
@@ -387,10 +388,13 @@ def load_eval_data(data_path: str):
         df = pd.read_parquet(data_path)
         data = []
         for _, row in df.iterrows():
-            data.append(normalize_record({
+            rec = normalize_record({
                 "文本": row.get("original_text", row.get("文本", row.get("content", ""))),
                 "标签": row.get("category", row.get("标签", ""))
-            }))
+            })
+            if "all_labels" in row and row["all_labels"] is not None:
+                rec["all_labels"] = row["all_labels"]
+            data.append(rec)
         return data
     elif data_path.endswith('.jsonl'):
         data = []
