@@ -163,7 +163,7 @@ CAT_DEFAULTS: Dict[str, Dict] = {
     "种族歧视": {"toxic_type": "仇恨言论", "expression": "隐式仇恨"},
     "地域偏见": {"toxic_type": "仇恨言论", "expression": "隐式仇恨"},
     "LGBTQ歧视": {"toxic_type": "仇恨言论", "expression": "隐式仇恨"},
-    "其他仇恨":  {"toxic_type": "一般攻击性", "expression": "非仇恨"},
+    "其他仇恨":  {"toxic_type": "一般攻击性", "expression": "显式仇恨"},
     "无毒":      {"toxic_type": "无毒", "expression": "非仇恨"},
 }
 
