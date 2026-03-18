@@ -22,7 +22,6 @@ cd "$SCRIPT_DIR"
 
 CORRECTED_DIR="$SCRIPT_DIR/corrected_data"
 PREPARED_DIR="$SCRIPT_DIR/prepared_data"
-PREPARED_V2_DIR="$SCRIPT_DIR/prepared_data_v2"
 SPLIT_DIR="$SCRIPT_DIR/split_data"
 
 echo "============================================================"
@@ -47,7 +46,7 @@ echo ""
 # ─────────────────────────────────────────────────────────────────
 # Step 1: 部署 SFT 数据
 # ─────────────────────────────────────────────────────────────────
-echo "[1/5] 部署 SFT 数据到 prepared_data/"
+echo "[1/4] 部署 SFT 数据到 prepared_data/"
 
 mkdir -p "$PREPARED_DIR/challenger_sft"
 mkdir -p "$PREPARED_DIR/reviewer_sft"
@@ -67,7 +66,7 @@ echo ""
 # ─────────────────────────────────────────────────────────────────
 # Step 2: 部署 split_data 并生成 parquet
 # ─────────────────────────────────────────────────────────────────
-echo "[2/5] 部署 split_data/ 并生成 parquet"
+echo "[2/4] 部署 split_data/ 并生成 parquet"
 
 mkdir -p "$SPLIT_DIR"
 
@@ -117,7 +116,7 @@ echo ""
 # ─────────────────────────────────────────────────────────────────
 # Step 3: 重新生成 RL 数据 (parquet + JSON)
 # ─────────────────────────────────────────────────────────────────
-echo "[3/5] 重新生成 prepared_data/rl/ (修正标签版)"
+echo "[3/4] 重新生成 prepared_data/rl/ (修正标签版)"
 
 mkdir -p "$PREPARED_DIR/rl"
 
@@ -164,28 +163,12 @@ PYEOF
 
 echo ""
 
-# ─────────────────────────────────────────────────────────────────
-# Step 4: 同步更新 prepared_data_v2/rl/ (如果存在)
-# ─────────────────────────────────────────────────────────────────
-echo "[4/5] 同步 prepared_data_v2/rl/"
-
-if [ -d "$PREPARED_V2_DIR/rl" ]; then
-    cp "$PREPARED_DIR/rl/train_seed.json"    "$PREPARED_V2_DIR/rl/train_seed.json"
-    cp "$PREPARED_DIR/rl/train_seed.parquet"  "$PREPARED_V2_DIR/rl/train_seed.parquet"
-    cp "$PREPARED_DIR/rl/val_eval.json"       "$PREPARED_V2_DIR/rl/val_eval.json"
-    cp "$PREPARED_DIR/rl/val_eval.parquet"    "$PREPARED_V2_DIR/rl/val_eval.parquet"
-    cp "$PREPARED_DIR/rl/test_eval.json"      "$PREPARED_V2_DIR/rl/test_eval.json"
-    cp "$PREPARED_DIR/rl/test_eval.parquet"   "$PREPARED_V2_DIR/rl/test_eval.parquet"
-    echo "  ✓ prepared_data_v2/rl/ 已同步"
-else
-    echo "  ⏭  prepared_data_v2/rl/ 不存在，跳过"
-fi
 echo ""
 
 # ─────────────────────────────────────────────────────────────────
 # Step 5: 验证
 # ─────────────────────────────────────────────────────────────────
-echo "[5/5] 验证数据完整性"
+echo "[4/4] 验证数据完整性"
 echo ""
 
 ERRORS=0
