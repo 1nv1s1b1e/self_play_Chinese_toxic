@@ -88,7 +88,7 @@ VERIFIER_FEW_SHOTS = [
     # 其他仇恨 - 人身攻击
     {
         "text": "你这个废物，滚出去，别浪费空气了！",
-        "label": "判断：有害\n类别：其他仇恨\n毒性类型：一般攻击性\n表达方式：显式仇恨",
+        "label": "判断：有害\n类别：其他仇恨\n毒性类型：一般攻击性\n表达方式：非仇恨",
     },
     # 无毒 - 正常讨论（容易被误判的边界案例）
     {
@@ -178,7 +178,7 @@ CAT_DEFAULTS = {
     "种族歧视": {"toxic_type": "仇恨言论", "expression": "隐式仇恨"},
     "地域偏见": {"toxic_type": "仇恨言论", "expression": "隐式仇恨"},
     "LGBTQ歧视": {"toxic_type": "仇恨言论", "expression": "隐式仇恨"},
-    "其他仇恨":  {"toxic_type": "一般攻击性", "expression": "显式仇恨"},
+    "其他仇恨":  {"toxic_type": "一般攻击性", "expression": "非仇恨"},
     "无毒":      {"toxic_type": "无毒", "expression": "非仇恨"},
 }
 
