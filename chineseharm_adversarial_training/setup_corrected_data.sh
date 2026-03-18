@@ -2,12 +2,9 @@
 # =============================================================================
 # 修正数据一键部署脚本
 # =============================================================================
-# 功能:
-#   1. 将 corrected_data/ 中的 SFT 数据部署到脚本期望的路径
-#   2. 生成 split_data/ 下的 parquet 文件（RL数据准备需要）
-#   3. 重新生成 prepared_data/rl/ 下的所有 parquet（修正旧标签）
-#   4. 生成 self-play 所需的 train_seed.parquet
-#   5. 部署评估数据到正确位置
+# 将 corrected_data/ 中的数据部署到 pipeline 脚本期望的路径:
+#   $BASE_DIR/prepared_data/   (SFT + RL 数据)
+#   $BASE_DIR/split_data/      (评估 + RL 数据)
 #
 # 用法:
 #   cd /home/ma-user/work/test/chineseharm_adversarial_training
@@ -20,15 +17,20 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$SCRIPT_DIR"
 
+# BASE_DIR = 仓库根目录 (chineseharm_adversarial_training 的上一级)
+# 所有 pipeline 脚本用 $BASE_DIR/prepared_data, $BASE_DIR/split_data 等
+BASE_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+
 CORRECTED_DIR="$SCRIPT_DIR/corrected_data"
-PREPARED_DIR="$SCRIPT_DIR/prepared_data"
-SPLIT_DIR="$SCRIPT_DIR/split_data"
+PREPARED_DIR="$BASE_DIR/prepared_data"
+SPLIT_DIR="$BASE_DIR/split_data"
 
 echo "============================================================"
 echo "  修正数据一键部署"
 echo "============================================================"
-echo "  修正数据目录: $CORRECTED_DIR"
-echo "  目标目录:     $PREPARED_DIR, $SPLIT_DIR"
+echo "  数据源:   $CORRECTED_DIR"
+echo "  BASE_DIR: $BASE_DIR"
+echo "  部署到:   $PREPARED_DIR, $SPLIT_DIR"
 echo ""
 
 # 检查修正数据是否存在
@@ -46,7 +48,7 @@ echo ""
 # ─────────────────────────────────────────────────────────────────
 # Step 1: 部署 SFT 数据
 # ─────────────────────────────────────────────────────────────────
-echo "[1/4] 部署 SFT 数据到 prepared_data/"
+echo "[1/4] 部署 SFT 数据到 $PREPARED_DIR/"
 
 mkdir -p "$PREPARED_DIR/challenger_sft"
 mkdir -p "$PREPARED_DIR/reviewer_sft"
@@ -74,16 +76,11 @@ cp "$CORRECTED_DIR/train.json" "$SPLIT_DIR/train.json"
 cp "$CORRECTED_DIR/val.json"   "$SPLIT_DIR/val.json"
 cp "$CORRECTED_DIR/test.json"  "$SPLIT_DIR/test.json"
 
-python3 - <<'PYEOF'
-import json
-import pandas as pd
-import sys
-import os
+SPLIT_DIR="$SPLIT_DIR" python3 - <<'PYEOF'
+import json, pandas as pd, os
 
-split_dir = os.environ.get("SPLIT_DIR", "split_data")
-corrected_dir = os.environ.get("CORRECTED_DIR", "corrected_data")
+split_dir = os.environ["SPLIT_DIR"]
 
-# 类别 → 默认 toxic_type / expression 映射 (与 constants.py CAT_DEFAULTS 一致)
 CAT_DEFAULTS = {
     "性别歧视": {"toxic_type": "仇恨言论", "expression": "隐式仇恨"},
     "种族歧视": {"toxic_type": "仇恨言论", "expression": "隐式仇恨"},
@@ -94,19 +91,13 @@ CAT_DEFAULTS = {
 }
 
 for split in ["train", "val", "test"]:
-    json_path = os.path.join(split_dir, f"{split}.json")
-    with open(json_path, "r", encoding="utf-8") as f:
+    with open(os.path.join(split_dir, f"{split}.json"), "r", encoding="utf-8") as f:
         data = json.load(f)
-
     df = pd.DataFrame(data)
-
-    # 补充 toxic_type_label 和 expression_label (RL 数据准备需要)
     df["toxic_type_label"] = df["标签"].map(lambda c: CAT_DEFAULTS.get(c, {}).get("toxic_type", ""))
     df["expression_label"] = df["标签"].map(lambda c: CAT_DEFAULTS.get(c, {}).get("expression", ""))
-
-    parquet_path = os.path.join(split_dir, f"{split}.parquet")
-    df.to_parquet(parquet_path, index=False)
-    print(f"  {split}.parquet: {len(df)} 条 | 列: {list(df.columns)}")
+    df.to_parquet(os.path.join(split_dir, f"{split}.parquet"), index=False)
+    print(f"  {split}.parquet: {len(df)} 条")
 
 print("✓ split_data parquet 生成完成")
 PYEOF
@@ -114,73 +105,46 @@ PYEOF
 echo ""
 
 # ─────────────────────────────────────────────────────────────────
-# Step 3: 重新生成 RL 数据 (parquet + JSON)
+# Step 3: 重新生成 RL 数据 (JSON + parquet)
 # ─────────────────────────────────────────────────────────────────
-echo "[3/4] 重新生成 prepared_data/rl/ (修正标签版)"
+echo "[3/4] 重新生成 $PREPARED_DIR/rl/"
 
 mkdir -p "$PREPARED_DIR/rl"
 
-SPLIT_DIR="$SPLIT_DIR" CORRECTED_DIR="$CORRECTED_DIR" python3 - <<'PYEOF'
-import json
-import os
-import pandas as pd
+SPLIT_DIR="$SPLIT_DIR" RL_DIR="$PREPARED_DIR/rl" python3 - <<'PYEOF'
+import json, pandas as pd, os
 
-split_dir = os.environ.get("SPLIT_DIR", "split_data")
-corrected_dir = os.environ.get("CORRECTED_DIR", "corrected_data")
-rl_dir = os.path.join(os.path.dirname(corrected_dir), "prepared_data", "rl")
+split_dir = os.environ["SPLIT_DIR"]
+rl_dir = os.environ["RL_DIR"]
 
-# ── 加载修正数据 (已带 toxic_type_label / expression_label) ──
-train_df = pd.read_parquet(os.path.join(split_dir, "train.parquet"))
-val_df   = pd.read_parquet(os.path.join(split_dir, "val.parquet"))
-test_df  = pd.read_parquet(os.path.join(split_dir, "test.parquet"))
-
-# ── 生成 train_seed / val_eval / test_eval ──
-# 格式: 简单表格 [{文本, 标签, all_labels, toxic_type_label, expression_label}, ...]
-# all_labels: 多标签列表，评估时模型预测命中其中任一即算正确
-# generate_dynamic_data.py 的 build_sampling_tasks() 直接读这些列
-for split, df, name in [
-    ("train", train_df, "train_seed"),
-    ("val",   val_df,   "val_eval"),
-    ("test",  test_df,  "test_eval"),
-]:
-    keep_cols = ["文本", "标签", "toxic_type_label", "expression_label"]
+for split, name in [("train", "train_seed"), ("val", "val_eval"), ("test", "test_eval")]:
+    df = pd.read_parquet(os.path.join(split_dir, f"{split}.parquet"))
+    keep = ["文本", "标签"]
     if "all_labels" in df.columns:
-        keep_cols.insert(2, "all_labels")
-    out_df = df[keep_cols].copy()
+        keep.append("all_labels")
+    keep += ["toxic_type_label", "expression_label"]
+    out = df[keep].copy()
+    out.to_json(os.path.join(rl_dir, f"{name}.json"), orient="records", force_ascii=False, indent=2)
+    out.to_parquet(os.path.join(rl_dir, f"{name}.parquet"), index=False)
+    print(f"  {name}: {len(out)} 条 → .json + .parquet")
 
-    # JSON (用于评估脚本 batch_eval_npu_vllm.py 等)
-    json_path = os.path.join(rl_dir, f"{name}.json")
-    out_df.to_json(json_path, orient="records", force_ascii=False, indent=2)
-
-    # Parquet (用于 self-play seed_data)
-    parquet_path = os.path.join(rl_dir, f"{name}.parquet")
-    out_df.to_parquet(parquet_path, index=False)
-
-    print(f"  {name}: {len(out_df)} 条 → .json + .parquet  列={list(out_df.columns)}")
-
-print("✓ RL 数据重新生成完成 (使用修正标签)")
+print("✓ RL 数据生成完成")
 PYEOF
 
 echo ""
 
-echo ""
-
 # ─────────────────────────────────────────────────────────────────
-# Step 5: 验证
+# Step 4: 验证
 # ─────────────────────────────────────────────────────────────────
 echo "[4/4] 验证数据完整性"
 echo ""
 
 ERRORS=0
-
 check_file() {
-    local path="$1"
-    local desc="$2"
-    if [ -f "$path" ]; then
-        local size=$(du -h "$path" | cut -f1)
-        echo "  ✓ $desc ($size)"
+    if [ -f "$1" ]; then
+        echo "  ✓ $2 ($(du -h "$1" | cut -f1))"
     else
-        echo "  ❌ $desc 缺失: $path"
+        echo "  ❌ $2 缺失: $1"
         ERRORS=$((ERRORS + 1))
     fi
 }
@@ -193,25 +157,19 @@ check_file "$PREPARED_DIR/reviewer_sft/val.jsonl"     "Reviewer SFT val"
 echo ""
 
 echo "Split 数据:"
-check_file "$SPLIT_DIR/train.json"    "train.json"
 check_file "$SPLIT_DIR/train.parquet" "train.parquet"
 check_file "$SPLIT_DIR/val.json"      "val.json (self-play 评估)"
-check_file "$SPLIT_DIR/val.parquet"   "val.parquet"
-check_file "$SPLIT_DIR/test.json"     "test.json"
 check_file "$SPLIT_DIR/test.parquet"  "test.parquet"
 echo ""
 
 echo "RL 数据:"
-check_file "$PREPARED_DIR/rl/train_seed.json"    "train_seed.json"
-check_file "$PREPARED_DIR/rl/train_seed.parquet"  "train_seed.parquet (self-play 种子)"
-check_file "$PREPARED_DIR/rl/val_eval.json"       "val_eval.json"
-check_file "$PREPARED_DIR/rl/val_eval.parquet"    "val_eval.parquet"
-check_file "$PREPARED_DIR/rl/test_eval.json"      "test_eval.json"
-check_file "$PREPARED_DIR/rl/test_eval.parquet"   "test_eval.parquet"
+check_file "$PREPARED_DIR/rl/train_seed.parquet" "train_seed.parquet (self-play 种子)"
+check_file "$PREPARED_DIR/rl/test_eval.json"     "test_eval.json (评估)"
+check_file "$PREPARED_DIR/rl/test_eval.parquet"  "test_eval.parquet"
 echo ""
 
 if [ "$ERRORS" -gt 0 ]; then
-    echo "❌ 发现 $ERRORS 个错误，请检查上述输出"
+    echo "❌ 发现 $ERRORS 个错误"
     exit 1
 fi
 
@@ -220,10 +178,4 @@ echo "✓ 全部数据部署完成！"
 echo "============================================================"
 echo ""
 echo "后续步骤:"
-echo "  1. bash scripts/run_pipeline/run_01_download.sh    # 下载模型"
-echo "  2. bash scripts/run_pipeline/run_03_lora_sft.sh   # LoRA 微调"
-echo "  3. bash scripts/run_pipeline/run_04_merge_lora.sh  # 合并 LoRA"
-echo "  4. bash scripts/run_pipeline/run_05_evaluate.sh    # 评估"
-echo "  5. bash scripts/integrated_selfplay/run_selfplay.sh  # Self-Play"
-echo ""
-echo "注意: Step 2 (prepare_data) 和 Step 6 (prepare_rl_data) 已由本脚本完成，无需再运行。"
+echo "  MODEL_SIZE=3B bash scripts/run_pipeline/run_full_pipeline.sh"
