@@ -325,7 +325,7 @@ run_grpo() {
         --grad_accum             "${GRAD_ACC}" \
         --selfplay_step          "${CURRENT_STEP:-0}" \
         $([ "${ROLE}" = "challenger" ] && [ -n "${REVIEWER_PATH}" ] && echo "--reviewer_model_path ${REVIEWER_PATH} --reviewer_batch_size ${REVIEWER_BATCH_SIZE}") \
-        --deepspeed "${SCRIPT_DIR}/ds_zero2.json" \
+        --deepspeed "${SCRIPT_DIR}/ds_zero3_cpu_adam.json" \
         2>&1 | tee "${LOG_FILE}"
 
     if [ ! -f "${OUTPUT_PATH}/training_done.txt" ]; then
