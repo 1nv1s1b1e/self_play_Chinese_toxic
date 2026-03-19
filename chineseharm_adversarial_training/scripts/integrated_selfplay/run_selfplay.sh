@@ -372,10 +372,8 @@ print(f"{acc:.6f},{macro_f1:.6f},{nt_rec:.6f}")
 PY
 }
 
-# Reviewer 评估基线 & 退化回退计数
+# Reviewer 评估基线
 BEST_REVIEWER_ACC="0.0"
-DECLINE_COUNT=0
-MAX_DECLINE="${MAX_DECLINE:-3}"   # 连续下降 N 步后从 best 回退
 if [ -f "${REVIEWER_EVAL_DATA}" ]; then
     echo "  ▶ 初始化 Reviewer 评估基线..."
     mkdir -p "${SELFPLAY_DIR}/eval_init"
@@ -479,23 +477,18 @@ for STEP in $(seq 1 "${TOTAL_STEPS}"); do
                 CAND_NT=$(echo "${METRICS}" | cut -d, -f3)
                 echo "   📊 结果: acc=${CAND_ACC}, macro_f1=${CAND_MACRO}, nt_recall=${CAND_NT}%"
 
-                # 如果是历史最优，保存到 best/；否则累计下降计数
+                # 如果是历史最优，保存到 best/ 并采纳本步模型
+                # 否则丢弃本步结果，下一步从 best 模型继续（面对新数据）
                 IS_BEST=$($PYTHON_EXEC -c "print('1' if float('${CAND_ACC}') > float('${BEST_REVIEWER_ACC}') else '0')")
                 if [ "${IS_BEST}" = "1" ]; then
                     BEST_REVIEWER_ACC="${CAND_ACC}"
                     BEST_REVIEWER_MACRO_F1="${CAND_MACRO}"
                     BEST_REVIEWER_NT_REC="${CAND_NT}"
-                    DECLINE_COUNT=0
                     save_best_model
                 else
-                    DECLINE_COUNT=$((DECLINE_COUNT + 1))
-                    echo "   ⚠️ 未超过 best (${BEST_REVIEWER_ACC})，连续未提升 ${DECLINE_COUNT}/${MAX_DECLINE}"
-                    if [ "${DECLINE_COUNT}" -ge "${MAX_DECLINE}" ] && [ -d "${BEST_DIR}/reviewer" ]; then
-                        echo "   🔄 连续 ${MAX_DECLINE} 步未提升，从 best 模型回退"
-                        CURRENT_CHALLENGER="${BEST_DIR}/challenger"
-                        CURRENT_REVIEWER="${BEST_DIR}/reviewer"
-                        DECLINE_COUNT=0
-                    fi
+                    echo "   ⚠️ 未超过 best (${BEST_REVIEWER_ACC})，丢弃本步，下步从 best 继续"
+                    CURRENT_CHALLENGER="${BEST_DIR}/challenger"
+                    CURRENT_REVIEWER="${BEST_DIR}/reviewer"
                 fi
             else
                 echo "   ⚠️ 评估失败，跳过"
