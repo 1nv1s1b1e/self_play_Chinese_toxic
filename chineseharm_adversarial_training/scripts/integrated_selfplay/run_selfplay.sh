@@ -53,7 +53,7 @@ RESUME="${RESUME:-1}"
 CHECK_INTERVAL="${CHECK_INTERVAL:-1}"         # 每 N 步做一次评估检查 (默认每步都评估)
 
 # GRPO 训练: 每个 step 训 1 个 epoch（TRL 自动根据数据量计算步数）
-GRPO_EPOCHS="${GRPO_EPOCHS:-2}"             # 2 epoch 给每步更多学习时间（~12梯度步）
+GRPO_EPOCHS="${GRPO_EPOCHS:-1}"             # 1 epoch/步：避免过拟合当前步数据，靠多步迭代提升
 
 # Challenger GRPO 超参
 C_LR="${C_LR:-5e-7}"
