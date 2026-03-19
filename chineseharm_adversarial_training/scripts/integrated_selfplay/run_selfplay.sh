@@ -434,15 +434,16 @@ for STEP in $(seq 1 "${TOTAL_STEPS}"); do
     if [ -z "${RESUME_SKIP_PHASE}" ] || [ "${RESUME_SKIP_PHASE}" \< "challenger" ]; then
         echo ""
         echo "── Challenger GRPO (Step ${STEP}) ──"
-        # 不传 REVIEWER_PATH → 使用 parquet 中预计算的 reviewer_fooled 信号
-        # 避免在训练 NPU 上同时加载两个 3B 模型导致 OOM
+        # LoRA 训练下显存充足，启用在线 Reviewer 实时评估每条新 completion
+        # 这样 GRPO 的 K 条 completion 得到不同 reward → 有效的 advantage 信号
         run_grpo \
             "challenger" \
             "${CURRENT_CHALLENGER}" \
             "${C_DATA}" \
             "${STEP_DIR}/challenger" \
             "${LOG_DIR}/step${STEP}_challenger_$(date +%Y%m%d_%H%M%S).log" \
-            "29600"
+            "29600" \
+            "${CURRENT_REVIEWER}"
 
         CURRENT_CHALLENGER="${STEP_DIR}/challenger"
         save_progress "${STEP}" "challenger"
