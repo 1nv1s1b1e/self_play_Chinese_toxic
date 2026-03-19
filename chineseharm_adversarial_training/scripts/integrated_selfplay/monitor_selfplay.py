@@ -178,6 +178,35 @@ def collect_step_data(data_dir: str) -> list:
     return rows
 
 
+def rescue_eval_jsons(selfplay_dir: str):
+    """扫描所有 step_*/eval_gate/*.json，拷贝到 eval_history/ 避免被 cleanup 删除"""
+    eval_history = os.path.join(selfplay_dir, "eval_history")
+    os.makedirs(eval_history, exist_ok=True)
+
+    import shutil
+    saved = 0
+    for eval_json in sorted(glob.glob(os.path.join(selfplay_dir, "step_*/eval_gate/*.json"))):
+        # 提取 step 编号
+        parts = eval_json.split(os.sep)
+        step_part = [p for p in parts if p.startswith("step_")]
+        if not step_part:
+            continue
+        step_num = step_part[0].replace("step_", "")
+        dst = os.path.join(eval_history, f"eval_step{step_num}.json")
+        if not os.path.exists(dst):
+            shutil.copy2(eval_json, dst)
+            saved += 1
+
+    # 也检查 step_0（baseline 评估，在 eval_init/ 里）
+    for eval_json in glob.glob(os.path.join(selfplay_dir, "eval_init/*.json")):
+        dst = os.path.join(eval_history, "eval_step0.json")
+        if not os.path.exists(dst):
+            shutil.copy2(eval_json, dst)
+            saved += 1
+
+    return saved
+
+
 def save_snapshot(selfplay_dir: str, data_dir: str, entries: list, step_data: list):
     """保存完整监控快照到 selfplay_dir/monitor_snapshots/"""
     save_dir = os.path.join(selfplay_dir, "monitor_snapshots")
@@ -240,6 +269,15 @@ def monitor_once(selfplay_dir: str, data_dir: str):
     print("\n── 每步数据统计 ──")
     step_data = collect_step_data(data_dir)
     print_step_data_summary(data_dir)
+
+    # 抢救 eval JSON（在被 cleanup 删除前拷贝到 eval_history/）
+    rescued = rescue_eval_jsons(selfplay_dir)
+    eval_history = os.path.join(selfplay_dir, "eval_history")
+    total_evals = len(glob.glob(os.path.join(eval_history, "eval_step*.json")))
+    if rescued > 0:
+        print(f"\n  已抢救 {rescued} 个 eval JSON → eval_history/ (共 {total_evals} 个)")
+    else:
+        print(f"\n  eval_history/: {total_evals} 个评估结果已保存")
 
     # 保存快照
     if entries or step_data:
