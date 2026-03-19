@@ -58,15 +58,15 @@ GRPO_EPOCHS="${GRPO_EPOCHS:-1}"
 # Challenger GRPO 超参
 C_LR="${C_LR:-5e-7}"
 C_PER_DEVICE_BS="${C_PER_DEVICE_BS:-1}"
-C_NUM_GEN="${C_NUM_GEN:-4}"
+C_NUM_GEN="${C_NUM_GEN:-2}"               # K=2 大幅降低生成阶段 KV cache 显存
 C_MAX_COMP_LEN="${C_MAX_COMP_LEN:-128}"
 C_GRAD_ACCUM="${C_GRAD_ACCUM:-8}"
 
 # Reviewer GRPO 超参
 R_LR="${R_LR:-5e-7}"
 R_PER_DEVICE_BS="${R_PER_DEVICE_BS:-2}"
-R_NUM_GEN="${R_NUM_GEN:-4}"
-R_MAX_COMP_LEN="${R_MAX_COMP_LEN:-80}"
+R_NUM_GEN="${R_NUM_GEN:-2}"               # K=2 Reviewer 输出极短，2 条足够对比
+R_MAX_COMP_LEN="${R_MAX_COMP_LEN:-64}"    # 判断+类别最多 20 token，64 够了
 R_GRAD_ACCUM="${R_GRAD_ACCUM:-8}"
 
 # 在线 Reviewer 推理 batch size (Challenger GRPO 用)
@@ -325,7 +325,7 @@ run_grpo() {
         --grad_accum             "${GRAD_ACC}" \
         --selfplay_step          "${CURRENT_STEP:-0}" \
         $([ "${ROLE}" = "challenger" ] && [ -n "${REVIEWER_PATH}" ] && echo "--reviewer_model_path ${REVIEWER_PATH} --reviewer_batch_size ${REVIEWER_BATCH_SIZE}") \
-        --deepspeed "${SCRIPT_DIR}/ds_zero3_cpu_adam.json" \
+        --deepspeed "${SCRIPT_DIR}/ds_zero3_offload.json" \
         2>&1 | tee "${LOG_FILE}"
 
     if [ ! -f "${OUTPUT_PATH}/training_done.txt" ]; then
