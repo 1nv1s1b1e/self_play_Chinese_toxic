@@ -146,8 +146,83 @@ def print_progress(selfplay_dir: str):
         print("  暂无进度文件")
 
 
+def collect_step_data(data_dir: str) -> list:
+    """收集每步的 datagen 数据统计"""
+    if not os.path.exists(data_dir):
+        return []
+
+    rows = []
+    steps = sorted(glob.glob(os.path.join(data_dir, "step_*")))
+    for step_path in steps:
+        step_num = int(os.path.basename(step_path).replace("step_", ""))
+        info = {"step": step_num, "c_rows": 0, "r_rows": 0, "sr_rows": 0,
+                "fooled": 0, "cat_fooled": 0, "asr": 0.0}
+        try:
+            import pandas as pd
+            for pq in glob.glob(os.path.join(step_path, "challenger_grpo_*.parquet")):
+                info["c_rows"] = len(pd.read_parquet(pq))
+            for pq in glob.glob(os.path.join(step_path, "reviewer_grpo_*.parquet")):
+                info["r_rows"] = len(pd.read_parquet(pq))
+            for pq in glob.glob(os.path.join(step_path, "sample_rewards_*.parquet")):
+                df = pd.read_parquet(pq)
+                info["sr_rows"] = len(df)
+                if "reviewer_was_fooled" in df.columns:
+                    info["fooled"] = int(df["reviewer_was_fooled"].sum())
+                if "reviewer_cat_fooled" in df.columns:
+                    info["cat_fooled"] = int(df["reviewer_cat_fooled"].sum())
+                if len(df) > 0:
+                    info["asr"] = round(info["fooled"] / len(df), 4)
+        except ImportError:
+            pass
+        rows.append(info)
+    return rows
+
+
+def save_snapshot(selfplay_dir: str, data_dir: str, entries: list, step_data: list):
+    """保存完整监控快照到 selfplay_dir/monitor_snapshots/"""
+    save_dir = os.path.join(selfplay_dir, "monitor_snapshots")
+    os.makedirs(save_dir, exist_ok=True)
+
+    # 1. 保存 metrics CSV（覆盖，始终是最新完整版）
+    csv_path = os.path.join(save_dir, "metrics_history.csv")
+    with open(csv_path, "w", encoding="utf-8") as f:
+        f.write("step,asr,reviewer_acc,reviewer_macro_f1,best_acc,timestamp\n")
+        for e in entries:
+            row = [
+                str(e.get("step", "")),
+                str(e.get("asr", "")),
+                str(e.get("reviewer_acc", "")),
+                str(e.get("reviewer_macro_f1", "")),
+                str(e.get("best_acc", "")),
+                str(e.get("timestamp", "")),
+            ]
+            f.write(",".join(row) + "\n")
+
+    # 2. 保存每步数据统计 CSV
+    data_csv = os.path.join(save_dir, "step_data_history.csv")
+    with open(data_csv, "w", encoding="utf-8") as f:
+        f.write("step,c_rows,r_rows,sr_rows,fooled,cat_fooled,asr\n")
+        for d in step_data:
+            row = [str(d.get(k, "")) for k in
+                   ["step", "c_rows", "r_rows", "sr_rows", "fooled", "cat_fooled", "asr"]]
+            f.write(",".join(row) + "\n")
+
+    # 3. 保存完整 JSON 快照（带时间戳）
+    snapshot = {
+        "snapshot_time": datetime.now().isoformat(),
+        "metrics": entries,
+        "step_data": step_data,
+    }
+    # 最新快照（覆盖）
+    json_path = os.path.join(save_dir, "latest_snapshot.json")
+    with open(json_path, "w", encoding="utf-8") as f:
+        json.dump(snapshot, f, ensure_ascii=False, indent=2)
+
+    return csv_path
+
+
 def monitor_once(selfplay_dir: str, data_dir: str):
-    """单次输出全部监控信息"""
+    """单次输出全部监控信息并保存快照"""
     metrics_path = os.path.join(selfplay_dir, "metrics.jsonl")
 
     print("=" * 70)
@@ -163,7 +238,13 @@ def monitor_once(selfplay_dir: str, data_dir: str):
     print_metrics_table(entries)
 
     print("\n── 每步数据统计 ──")
+    step_data = collect_step_data(data_dir)
     print_step_data_summary(data_dir)
+
+    # 保存快照
+    if entries or step_data:
+        csv_path = save_snapshot(selfplay_dir, data_dir, entries, step_data)
+        print(f"  快照已保存: {os.path.dirname(csv_path)}/")
 
     print()
 
