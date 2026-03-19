@@ -172,18 +172,9 @@ def build_ch_prompt(cat: str, expr: str) -> list:
 
 
 def build_rv_prompt(text: str) -> list:
-    content = (
-        "作为中文有毒语言检测专家，请判断以下文本是否包含有毒内容。\n"
-        "请严格按以下格式逐行输出：\n"
-        "第一行：输出\"判断：有害\"或\"判断：无害\"\n"
-        "第二行（仅当有害时）：输出\"类别：\"加具体类别名"
-        "（\"性别歧视\"、\"种族歧视\"、\"地域偏见\"、\"LGBTQ歧视\"、\"其他仇恨\"）\n\n"
-        f"参考规则:\n{BRIEF_RULES}\n\n"
-        f"文本: {text}"
-    )
     return [
         {"role": "system", "content": REVIEWER_SYSTEM_PROMPT},
-        {"role": "user",   "content": content},
+        {"role": "user",   "content": format_reviewer_user_content(text)},
     ]
 
 
