@@ -106,7 +106,8 @@ DATA_DIR="${BASE_DIR}/selfplay_integrated_data/${MODEL_SIZE}"
 LATEST_DIR="${SELFPLAY_DIR}/latest"
 BEST_DIR="${SELFPLAY_DIR}/best"  # 评估最优的模型
 
-mkdir -p "${SELFPLAY_DIR}" "${LOG_DIR}" "${DATA_DIR}" "${LATEST_DIR}" "${BEST_DIR}"
+EVAL_HISTORY_DIR="${SELFPLAY_DIR}/eval_history"
+mkdir -p "${SELFPLAY_DIR}" "${LOG_DIR}" "${DATA_DIR}" "${LATEST_DIR}" "${BEST_DIR}" "${EVAL_HISTORY_DIR}"
 
 # 全局指标日志（每步追加一行 JSON，便于绘图分析）
 METRICS_LOG="${SELFPLAY_DIR}/metrics.jsonl"
@@ -359,6 +360,9 @@ evaluate_reviewer_metrics() {
     local MODEL_NAME=$(basename "${MODEL_PATH}")
     local EVAL_JSON="${EVAL_OUT_DIR}/eval_vllm_npu_${MODEL_NAME}_step${STEP}_gate.json"
     [ ! -f "${EVAL_JSON}" ] && { echo "EVAL_FAILED"; return; }
+
+    # 持久保存 eval JSON（含完整推理结果），不会被 cleanup 删除
+    cp "${EVAL_JSON}" "${EVAL_HISTORY_DIR}/eval_step${STEP}.json" 2>/dev/null || true
 
     $PYTHON_EXEC - <<PY
 import json
