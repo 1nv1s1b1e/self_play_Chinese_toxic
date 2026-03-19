@@ -39,14 +39,14 @@ export TASK_QUEUE_ENABLE=1
 # ─────────────────────────────────────────────────────────────────────────────────
 # 3. 训练超参数
 # ─────────────────────────────────────────────────────────────────────────────────
-BASE_DIR="${BASE_DIR:-$(cd "$SCRIPT_DIR/../.." && pwd)}"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+BASE_DIR="${BASE_DIR:-$(cd "$SCRIPT_DIR/../.." && pwd)}"
 
 MODEL_SIZE="${MODEL_SIZE:-3B}"
 N_GPUS="${N_GPUS:-4}"
 TOTAL_STEPS="${TOTAL_STEPS:-50}"              # 自对弈总步数
-SAMPLES_PER_CAT="${SAMPLES_PER_CAT:-20}"      # 每类有毒生成样本数 (5有毒类×20=100条)
-NONTOXIC_SAMPLES="${NONTOXIC_SAMPLES:-89}"    # 无毒样本数, 使有毒:无毒≈53:47 匹配 benchmark
+SAMPLES_PER_CAT="${SAMPLES_PER_CAT:-40}"      # 每类有毒生成样本数 (5有毒类×40=200条)
+NONTOXIC_SAMPLES="${NONTOXIC_SAMPLES:-178}"   # 无毒样本数, 使有毒:无毒≈53:47 匹配 benchmark
 GEN_BATCH_SIZE="${GEN_BATCH_SIZE:-4}"
 RESUME="${RESUME:-1}"
 
@@ -108,6 +108,9 @@ LATEST_DIR="${SELFPLAY_DIR}/latest"
 BEST_DIR="${SELFPLAY_DIR}/best"  # 评估最优的模型
 
 mkdir -p "${SELFPLAY_DIR}" "${LOG_DIR}" "${DATA_DIR}" "${LATEST_DIR}" "${BEST_DIR}"
+
+# 全局指标日志（每步追加一行 JSON，便于绘图分析）
+METRICS_LOG="${SELFPLAY_DIR}/metrics.jsonl"
 
 # ─────────────────────────────────────────────────────────────────────────────────
 # 5. 断点续训
@@ -271,6 +274,10 @@ run_datagen() {
     [ -z "${R_DATA}" ] && R_DATA="${STEP_DATA_DIR}/reviewer_grpo_round${STEP}.parquet"
 
     echo "  ✓ [$(date +%H:%M:%S)] 数据生成完成"
+
+    # 从日志中提取本轮 ASR / fooling_rate 等指标
+    STEP_ASR=$(grep -oP 'fooling_rate[=: ]+\K[0-9.]+' "${LOG_FILE}" | tail -1 || echo "")
+    STEP_GEN_COUNT=$(grep -oP '生成.*?(\d+).*?条' "${LOG_FILE}" | grep -oP '\d+' | tail -1 || echo "")
 
     DATAGEN_CHALLENGER_DATA="${C_DATA}"
     DATAGEN_REVIEWER_DATA="${R_DATA}"
@@ -488,6 +495,24 @@ for STEP in $(seq 1 "${TOTAL_STEPS}"); do
     save_progress "${STEP}" "done"
     update_latest "${STEP}"
     cleanup_prev_step "${STEP}"
+
+    # ── 追加本步指标到 metrics.jsonl ──
+    $PYTHON_EXEC - <<METRICS_PY
+import json, datetime
+entry = {
+    "step": ${STEP},
+    "timestamp": datetime.datetime.now().isoformat(),
+    "asr": float("${STEP_ASR:-0}") if "${STEP_ASR}" else None,
+    "gen_count": int("${STEP_GEN_COUNT:-0}") if "${STEP_GEN_COUNT}" else None,
+    "reviewer_acc": float("${CAND_ACC:-0}") if "${CAND_ACC:-}" else None,
+    "reviewer_macro_f1": float("${CAND_MACRO:-0}") if "${CAND_MACRO:-}" else None,
+    "best_acc": float("${BEST_REVIEWER_ACC}"),
+    "challenger": "${CURRENT_CHALLENGER}",
+    "reviewer": "${CURRENT_REVIEWER}",
+}
+with open("${METRICS_LOG}", "a") as f:
+    f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+METRICS_PY
 
     echo ""
     echo "── Step ${STEP} 完成 ──"
