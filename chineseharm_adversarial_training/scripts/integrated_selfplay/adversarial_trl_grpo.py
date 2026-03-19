@@ -595,8 +595,14 @@ def main():
     print(f"8. 🚀 开始 {args.role} GRPO 更新！")
     trainer.train()
 
-    print("9. [保存] 最终模型...")
-    trainer.save_model(args.output_dir)
+    print("9. [保存] 合并 LoRA → 完整模型（vllm 兼容）...")
+    # 合并 LoRA 权重回基础模型，保存为标准 HF 格式
+    # 这样下一步的 vllm / generate_dynamic_data.py 可以直接加载
+    _save_model = trainer.model
+    if hasattr(_save_model, "merge_and_unload"):
+        _save_model = _save_model.merge_and_unload()
+        print("   ✅ LoRA 已合并到基础模型")
+    _save_model.save_pretrained(args.output_dir)
     tokenizer.save_pretrained(args.output_dir)
 
     # ── 确保 config.json 存在于输出目录根（vllm 下一轮加载必需）──

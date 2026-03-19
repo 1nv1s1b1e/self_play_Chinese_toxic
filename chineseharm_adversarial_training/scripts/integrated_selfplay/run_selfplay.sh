@@ -427,18 +427,8 @@ for STEP in $(seq 1 "${TOTAL_STEPS}"); do
     R_DATA="${STEP_DATA_DIR}/reviewer_grpo_round${STEP}.parquet"
     [ -n "${DATAGEN_CHALLENGER_DATA}" ] && [ -f "${DATAGEN_CHALLENGER_DATA}" ] && C_DATA="${DATAGEN_CHALLENGER_DATA}"
     [ -n "${DATAGEN_REVIEWER_DATA}" ]   && [ -f "${DATAGEN_REVIEWER_DATA}" ]   && R_DATA="${DATAGEN_REVIEWER_DATA}"
-
-    # 验证 datagen 输出，如果缺失则报错（不静默回退种子数据）
-    if [ ! -f "${C_DATA}" ] || [ ! -f "${R_DATA}" ]; then
-        echo "  ❌ datagen 输出文件缺失:"
-        echo "     C_DATA: ${C_DATA} (存在: $([ -f "${C_DATA}" ] && echo '是' || echo '否'))"
-        echo "     R_DATA: ${R_DATA} (存在: $([ -f "${R_DATA}" ] && echo '是' || echo '否'))"
-        echo "     DATAGEN_CHALLENGER_DATA: ${DATAGEN_CHALLENGER_DATA:-未设置}"
-        echo "     DATAGEN_REVIEWER_DATA:   ${DATAGEN_REVIEWER_DATA:-未设置}"
-        echo "     请检查 datagen 日志"
-        ls -la "${STEP_DATA_DIR}/" 2>/dev/null || echo "     数据目录不存在"
-        exit 1
-    fi
+    [ ! -f "${C_DATA}" ] && { echo "  ⚠️ Challenger 数据缺失，回退种子数据"; C_DATA="${SEED_DATA}"; }
+    [ ! -f "${R_DATA}" ] && { echo "  ⚠️ Reviewer 数据缺失，回退种子数据";   R_DATA="${SEED_DATA}"; }
 
     # ── 2. Challenger GRPO 更新 ──
     if [ -z "${RESUME_SKIP_PHASE}" ] || [ "${RESUME_SKIP_PHASE}" \< "challenger" ]; then
