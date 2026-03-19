@@ -530,7 +530,7 @@ def load_history_hard_rows(history_dir: str, current_round: int, max_rows: int) 
         return []
 
     all_rows: List[Dict] = []
-    for p in sorted(base.glob("round_*/sample_rewards_round*.parquet")):
+    for p in sorted(base.glob("step_*/sample_rewards_round*.parquet")):
         m = re.search(r"round(\d+)", p.stem)
         if not m:
             continue

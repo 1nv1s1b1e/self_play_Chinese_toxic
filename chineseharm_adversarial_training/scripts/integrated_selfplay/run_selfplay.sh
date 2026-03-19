@@ -53,7 +53,7 @@ RESUME="${RESUME:-1}"
 CHECK_INTERVAL="${CHECK_INTERVAL:-1}"         # 每 N 步做一次评估检查 (默认每步都评估)
 
 # GRPO 训练: 每个 step 训 1 个 epoch（TRL 自动根据数据量计算步数）
-GRPO_EPOCHS="${GRPO_EPOCHS:-1}"
+GRPO_EPOCHS="${GRPO_EPOCHS:-2}"             # 2 epoch 给每步更多学习时间（~12梯度步）
 
 # Challenger GRPO 超参
 C_LR="${C_LR:-5e-7}"
@@ -214,13 +214,14 @@ EOF
     echo "${CURRENT_REVIEWER}" > "${LATEST_DIR}/reviewer_latest.txt"
 }
 
-# 清理上一步的模型（只保留当前步 + best）
+# 清理旧步骤（保留最近 3 步 + best，历史数据 sample_rewards 保留供错题回放）
 cleanup_prev_step() {
     local CURRENT="$1"
-    local PREV=$((CURRENT - 1))
-    [ "${PREV}" -lt 1 ] && return
-    rm -rf "${SELFPLAY_DIR}/step_${PREV}" 2>/dev/null || true
-    rm -rf "${DATA_DIR}/step_${PREV}" 2>/dev/null || true
+    local KEEP=3
+    local OLD=$((CURRENT - KEEP))
+    [ "${OLD}" -lt 1 ] && return
+    # 删除旧模型 checkpoint（占空间大），但保留 DATA_DIR 中的 sample_rewards parquet
+    rm -rf "${SELFPLAY_DIR}/step_${OLD}" 2>/dev/null || true
 }
 
 # 保存最优模型
@@ -263,7 +264,8 @@ run_datagen() {
         --verifier_api_model "${VERIFIER_API_MODEL}" \
         --reviewer_mix_ratio    "${REVIEWER_MIX_RATIO}" \
         --reviewer_nontoxic_boost "${REVIEWER_NONTOXIC_BOOST}" \
-        --reviewer_hard_boost 1 \
+        --reviewer_hard_boost 2 \
+        --history_hard_dir "${DATA_DIR}" \
         --no_rejection_sampling \
     2>&1 | tee "${LOG_FILE}"
 
