@@ -342,14 +342,16 @@ evaluate_reviewer_metrics() {
     local EVAL_OUT_DIR="${SELFPLAY_DIR}/step_${STEP}/eval_gate"
     mkdir -p "${EVAL_OUT_DIR}"
 
-    ASCEND_RT_VISIBLE_DEVICES=$(seq -s, 0 $((N_GPUS-1))) \
+    # 评估用单卡 + enforce_eager 确保结果确定性
+    ASCEND_RT_VISIBLE_DEVICES=0 \
     $PYTHON_EXEC "${SCRIPT_DIR}/../model_eval/batch_eval_npu_vllm.py" \
         --data_path "${REVIEWER_EVAL_DATA}" \
         --model_path "${MODEL_PATH}" \
         --output_dir "${EVAL_OUT_DIR}" \
-        --num_npus "${N_GPUS}" \
+        --num_npus 1 \
         --tag "step${STEP}_gate" \
         --batch_size 128 \
+        --enforce_eager \
         >/dev/null 2>&1
 
     local MODEL_NAME=$(basename "${MODEL_PATH}")
