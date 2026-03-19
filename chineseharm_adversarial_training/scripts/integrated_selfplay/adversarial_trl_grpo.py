@@ -525,7 +525,23 @@ def main():
         device_map=None,
         trust_remote_code=True,
     )
-    print("   ✅ 模型加载完成")
+
+    # ── LoRA: 只训练少量参数，大幅降低优化器显存 ──
+    from peft import LoraConfig, get_peft_model, TaskType
+    lora_rank = 32 if "3B" in args.model_path or "7B" in args.model_path else 16
+    lora_alpha = lora_rank * 2
+    peft_config = LoraConfig(
+        task_type=TaskType.CAUSAL_LM,
+        r=lora_rank,
+        lora_alpha=lora_alpha,
+        lora_dropout=0.05,
+        target_modules=["q_proj", "k_proj", "v_proj", "o_proj",
+                         "gate_proj", "up_proj", "down_proj"],
+        inference_mode=False,
+    )
+    model = get_peft_model(model, peft_config)
+    model.print_trainable_parameters()
+    print("   ✅ 模型加载完成 (LoRA)")
 
     max_comp_len = args.max_completion_length
     if args.max_completion_length == 256:
