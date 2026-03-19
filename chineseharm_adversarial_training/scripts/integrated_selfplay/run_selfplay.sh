@@ -45,8 +45,8 @@ BASE_DIR="${BASE_DIR:-$(cd "$SCRIPT_DIR/../.." && pwd)}"
 MODEL_SIZE="${MODEL_SIZE:-3B}"
 N_GPUS="${N_GPUS:-4}"
 TOTAL_STEPS="${TOTAL_STEPS:-50}"              # 自对弈总步数
-SAMPLES_PER_CAT="${SAMPLES_PER_CAT:-40}"      # 每类有毒生成样本数 (5有毒类×40=200条)
-NONTOXIC_SAMPLES="${NONTOXIC_SAMPLES:-178}"   # 无毒样本数, 使有毒:无毒≈53:47 匹配 benchmark
+SAMPLES_PER_CAT="${SAMPLES_PER_CAT:-20}"      # 每类有毒生成样本数 (5有毒类×20=100条)
+NONTOXIC_SAMPLES="${NONTOXIC_SAMPLES:-89}"    # 无毒样本数, 使有毒:无毒≈53:47 匹配 benchmark
 GEN_BATCH_SIZE="${GEN_BATCH_SIZE:-4}"
 RESUME="${RESUME:-1}"
 
@@ -57,17 +57,17 @@ GRPO_EPOCHS="${GRPO_EPOCHS:-1}"
 
 # Challenger GRPO 超参
 C_LR="${C_LR:-5e-7}"
-C_PER_DEVICE_BS="${C_PER_DEVICE_BS:-1}"    # 32GB NPU 下 3B 模型用 bs=1
-C_NUM_GEN="${C_NUM_GEN:-4}"               # 每 prompt 生成 4 条
-C_MAX_COMP_LEN="${C_MAX_COMP_LEN:-128}"   # 有毒文本通常较短，128 足够
-C_GRAD_ACCUM="${C_GRAD_ACCUM:-8}"         # 补偿 bs=1，有效batch=1×4×8=32
+C_PER_DEVICE_BS="${C_PER_DEVICE_BS:-2}"
+C_NUM_GEN="${C_NUM_GEN:-4}"
+C_MAX_COMP_LEN="${C_MAX_COMP_LEN:-128}"
+C_GRAD_ACCUM="${C_GRAD_ACCUM:-4}"
 
 # Reviewer GRPO 超参
 R_LR="${R_LR:-5e-7}"
-R_PER_DEVICE_BS="${R_PER_DEVICE_BS:-2}"    # 32GB NPU 下降低 bs
-R_NUM_GEN="${R_NUM_GEN:-4}"               # 每 prompt 生成 4 条 (分类输出极短, 4 条即可)
+R_PER_DEVICE_BS="${R_PER_DEVICE_BS:-4}"
+R_NUM_GEN="${R_NUM_GEN:-4}"
 R_MAX_COMP_LEN="${R_MAX_COMP_LEN:-80}"
-R_GRAD_ACCUM="${R_GRAD_ACCUM:-8}"         # 补偿 bs 降低
+R_GRAD_ACCUM="${R_GRAD_ACCUM:-4}"
 
 # 在线 Reviewer 推理 batch size (Challenger GRPO 用)
 REVIEWER_BATCH_SIZE="${REVIEWER_BATCH_SIZE:-8}"
@@ -325,7 +325,7 @@ run_grpo() {
         --grad_accum             "${GRAD_ACC}" \
         --selfplay_step          "${CURRENT_STEP:-0}" \
         $([ "${ROLE}" = "challenger" ] && [ -n "${REVIEWER_PATH}" ] && echo "--reviewer_model_path ${REVIEWER_PATH} --reviewer_batch_size ${REVIEWER_BATCH_SIZE}") \
-        --deepspeed "${SCRIPT_DIR}/ds_zero3_offload.json" \
+        --deepspeed "${SCRIPT_DIR}/ds_zero2.json" \
         2>&1 | tee "${LOG_FILE}"
 
     if [ ! -f "${OUTPUT_PATH}/training_done.txt" ]; then
