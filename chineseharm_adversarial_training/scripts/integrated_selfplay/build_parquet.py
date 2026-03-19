@@ -55,12 +55,11 @@ def build_challenger_parquet(
         cat         = task["category"]
         few_shot    = task.get("few_shot_example", "").strip()
 
-        # ── few-shot 多轮 prompt 构建 ──
-        msgs = [{"role": "system", "content": build_challenger_system_prompt(cat)}]
-        if few_shot:
-            msgs.append({"role": "user",      "content": instr})
-            msgs.append({"role": "assistant", "content": few_shot})
-        msgs.append({"role": "user", "content": instr})
+        # 与 SFT 训练格式一致：[system, user] (无 few-shot)
+        msgs = [
+            {"role": "system", "content": build_challenger_system_prompt(cat)},
+            {"role": "user", "content": instr},
+        ]
 
         # ── 逐样本 1-acc 信号 ──
         sr = sample_rewards[i] if i < len(sample_rewards) else {}

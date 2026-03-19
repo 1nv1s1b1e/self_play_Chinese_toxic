@@ -601,21 +601,14 @@ def main():
 
     # ── Step 3: Challenger 推理 ──
     logger.info(f"\n[Step 3] Challenger 推理 (vLLM={_USE_VLLM}, NPUs={args.num_npus})...")
-    logger.info("   [Few-Shot] 每条任务随机注入一条真实样本作为示范 (多轮对话格式)")
 
-    # 构建 few-shot 多轮消息：[system, user(demo), assistant(示例文本), user(实际请求)]
+    # 构建消息：与 SFT 训练格式一致 [system, user] (无 few-shot)
     challenger_messages = []
     for t in tasks:
         msgs = [
             {"role": "system", "content": build_challenger_system_prompt(t["category"])},
+            {"role": "user", "content": t["challenger_instruction"]},
         ]
-        few_shot = t.get("few_shot_example", "").strip()
-        if few_shot:
-            # 示范轮：同一 instruction + 真实示例文本作为 assistant 回答
-            msgs.append({"role": "user",      "content": t["challenger_instruction"]})
-            msgs.append({"role": "assistant", "content": few_shot})
-        # 实际生成请求
-        msgs.append({"role": "user", "content": t["challenger_instruction"]})
         challenger_messages.append(msgs)
 
     if _USE_VLLM:
