@@ -57,9 +57,9 @@ GRPO_EPOCHS="${GRPO_EPOCHS:-1}"
 
 # Challenger GRPO 超参
 C_LR="${C_LR:-5e-7}"
-C_PER_DEVICE_BS="${C_PER_DEVICE_BS:-2}"
-C_NUM_GEN="${C_NUM_GEN:-4}"               # 每 prompt 生成 4 条 (378×4=1512 次生成)
-C_MAX_COMP_LEN="${C_MAX_COMP_LEN:-256}"
+C_PER_DEVICE_BS="${C_PER_DEVICE_BS:-1}"    # 32GB NPU 下 3B 模型用 bs=1
+C_NUM_GEN="${C_NUM_GEN:-4}"               # 每 prompt 生成 4 条
+C_MAX_COMP_LEN="${C_MAX_COMP_LEN:-128}"   # 有毒文本通常较短，128 足够
 C_GRAD_ACCUM="${C_GRAD_ACCUM:-4}"
 
 # Reviewer GRPO 超参
@@ -432,14 +432,15 @@ for STEP in $(seq 1 "${TOTAL_STEPS}"); do
     if [ -z "${RESUME_SKIP_PHASE}" ] || [ "${RESUME_SKIP_PHASE}" \< "challenger" ]; then
         echo ""
         echo "── Challenger GRPO (Step ${STEP}) ──"
+        # 不传 REVIEWER_PATH → 使用 parquet 中预计算的 reviewer_fooled 信号
+        # 避免在训练 NPU 上同时加载两个 3B 模型导致 OOM
         run_grpo \
             "challenger" \
             "${CURRENT_CHALLENGER}" \
             "${C_DATA}" \
             "${STEP_DIR}/challenger" \
             "${LOG_DIR}/step${STEP}_challenger_$(date +%Y%m%d_%H%M%S).log" \
-            "29600" \
-            "${CURRENT_REVIEWER}"
+            "29600"
 
         CURRENT_CHALLENGER="${STEP_DIR}/challenger"
         save_progress "${STEP}" "challenger"
