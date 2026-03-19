@@ -58,15 +58,14 @@ GRPO_EPOCHS="${GRPO_EPOCHS:-1}"
 # Challenger GRPO 超参
 C_LR="${C_LR:-5e-7}"
 C_PER_DEVICE_BS="${C_PER_DEVICE_BS:-2}"
-C_NUM_GEN="${C_NUM_GEN:-8}"
+C_NUM_GEN="${C_NUM_GEN:-4}"               # 每 prompt 生成 4 条 (378×4=1512 次生成)
 C_MAX_COMP_LEN="${C_MAX_COMP_LEN:-256}"
 C_GRAD_ACCUM="${C_GRAD_ACCUM:-4}"
 
 # Reviewer GRPO 超参
-# LR 从 2e-7 提高到 5e-7: 多级奖励下有更清晰梯度，可用更大步长
 R_LR="${R_LR:-5e-7}"
 R_PER_DEVICE_BS="${R_PER_DEVICE_BS:-4}"
-R_NUM_GEN="${R_NUM_GEN:-8}"
+R_NUM_GEN="${R_NUM_GEN:-4}"               # 每 prompt 生成 4 条 (分类输出极短, 4 条即可)
 R_MAX_COMP_LEN="${R_MAX_COMP_LEN:-80}"
 R_GRAD_ACCUM="${R_GRAD_ACCUM:-4}"
 
