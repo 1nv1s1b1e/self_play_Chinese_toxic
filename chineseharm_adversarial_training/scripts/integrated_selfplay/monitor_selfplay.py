@@ -178,15 +178,16 @@ def collect_step_data(data_dir: str) -> list:
     return rows
 
 
-def rescue_eval_jsons(selfplay_dir: str):
-    """扫描所有 step_*/eval_gate/*.json，拷贝到 eval_history/ 避免被 cleanup 删除"""
+def rescue_eval_jsons(selfplay_dir: str, data_dir: str):
+    """扫描所有会被 cleanup 删除的 JSON/parquet，拷贝到持久目录"""
+    import shutil
+    saved = 0
+
+    # 1. eval_gate JSON → eval_history/
     eval_history = os.path.join(selfplay_dir, "eval_history")
     os.makedirs(eval_history, exist_ok=True)
 
-    import shutil
-    saved = 0
     for eval_json in sorted(glob.glob(os.path.join(selfplay_dir, "step_*/eval_gate/*.json"))):
-        # 提取 step 编号
         parts = eval_json.split(os.sep)
         step_part = [p for p in parts if p.startswith("step_")]
         if not step_part:
@@ -197,12 +198,42 @@ def rescue_eval_jsons(selfplay_dir: str):
             shutil.copy2(eval_json, dst)
             saved += 1
 
-    # 也检查 step_0（baseline 评估，在 eval_init/ 里）
+    # baseline 评估
     for eval_json in glob.glob(os.path.join(selfplay_dir, "eval_init/*.json")):
         dst = os.path.join(eval_history, "eval_step0.json")
         if not os.path.exists(dst):
             shutil.copy2(eval_json, dst)
             saved += 1
+
+    # 2. datagen_stats JSON + sample_rewards parquet → datagen_history/
+    datagen_history = os.path.join(selfplay_dir, "datagen_history")
+    os.makedirs(datagen_history, exist_ok=True)
+
+    if data_dir and os.path.exists(data_dir):
+        for step_path in sorted(glob.glob(os.path.join(data_dir, "step_*"))):
+            step_name = os.path.basename(step_path)
+            step_num = step_name.replace("step_", "")
+
+            # datagen_stats_round*.json（含每类别 ASR/BinFool/CatConf 表）
+            for f in glob.glob(os.path.join(step_path, "datagen_stats_round*.json")):
+                dst = os.path.join(datagen_history, f"datagen_stats_step{step_num}.json")
+                if not os.path.exists(dst):
+                    shutil.copy2(f, dst)
+                    saved += 1
+
+            # sample_rewards parquet（逐样本明细）
+            for f in glob.glob(os.path.join(step_path, "sample_rewards_round*.parquet")):
+                dst = os.path.join(datagen_history, f"sample_rewards_step{step_num}.parquet")
+                if not os.path.exists(dst):
+                    shutil.copy2(f, dst)
+                    saved += 1
+
+            # challenger_trace parquet（生成追踪）
+            for f in glob.glob(os.path.join(step_path, "challenger_trace_round*.parquet")):
+                dst = os.path.join(datagen_history, f"challenger_trace_step{step_num}.parquet")
+                if not os.path.exists(dst):
+                    shutil.copy2(f, dst)
+                    saved += 1
 
     return saved
 
@@ -270,14 +301,12 @@ def monitor_once(selfplay_dir: str, data_dir: str):
     step_data = collect_step_data(data_dir)
     print_step_data_summary(data_dir)
 
-    # 抢救 eval JSON（在被 cleanup 删除前拷贝到 eval_history/）
-    rescued = rescue_eval_jsons(selfplay_dir)
-    eval_history = os.path.join(selfplay_dir, "eval_history")
-    total_evals = len(glob.glob(os.path.join(eval_history, "eval_step*.json")))
-    if rescued > 0:
-        print(f"\n  已抢救 {rescued} 个 eval JSON → eval_history/ (共 {total_evals} 个)")
-    else:
-        print(f"\n  eval_history/: {total_evals} 个评估结果已保存")
+    # 抢救所有数据（在被 cleanup 删除前拷贝到持久目录）
+    rescued = rescue_eval_jsons(selfplay_dir, data_dir)
+    eval_count = len(glob.glob(os.path.join(selfplay_dir, "eval_history", "eval_step*.json")))
+    datagen_count = len(glob.glob(os.path.join(selfplay_dir, "datagen_history", "datagen_stats_step*.json")))
+    print(f"\n  持久保存: eval={eval_count}, datagen_stats={datagen_count}" +
+          (f" (本次新增 {rescued})" if rescued > 0 else ""))
 
     # 保存快照
     if entries or step_data:
