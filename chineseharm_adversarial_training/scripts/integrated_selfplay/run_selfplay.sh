@@ -228,6 +228,8 @@ save_best_model() {
     cp -r "${CURRENT_CHALLENGER}" "${BEST_DIR}/challenger"
     cp -r "${CURRENT_REVIEWER}"   "${BEST_DIR}/reviewer"
     echo "${CURRENT_STEP}" > "${BEST_DIR}/best_step.txt"
+    # 持久化 best acc，重启时恢复
+    echo "${BEST_REVIEWER_ACC}" > "${BEST_DIR}/best_acc.txt"
 }
 
 # 数据生成: Challenger 生成 → Reviewer 评估 → 计算 1-acc 奖励 → 构建 GRPO parquet
@@ -362,18 +364,32 @@ print(f"{acc:.6f},{macro_f1:.6f},{nt_rec:.6f}")
 PY
 }
 
-# Reviewer 评估基线
-BEST_REVIEWER_ACC="0.0"
+# Reviewer 评估基线（优先从持久化文件恢复）
+if [ -f "${BEST_DIR}/best_acc.txt" ]; then
+    BEST_REVIEWER_ACC=$(cat "${BEST_DIR}/best_acc.txt")
+    echo "  ✅ 从 best_acc.txt 恢复历史最优: ${BEST_REVIEWER_ACC}"
+else
+    BEST_REVIEWER_ACC="0.0"
+fi
 if [ -f "${REVIEWER_EVAL_DATA}" ]; then
     echo "  ▶ 初始化 Reviewer 评估基线..."
     mkdir -p "${SELFPLAY_DIR}/eval_init"
     INIT_METRICS=$(evaluate_reviewer_metrics "${CURRENT_REVIEWER}" "0")
     if [ "${INIT_METRICS}" != "EVAL_FAILED" ]; then
-        BEST_REVIEWER_ACC=$(echo "${INIT_METRICS}" | cut -d, -f1)
+        INIT_ACC=$(echo "${INIT_METRICS}" | cut -d, -f1)
         INIT_MACRO=$(echo "${INIT_METRICS}" | cut -d, -f2)
         INIT_NT=$(echo "${INIT_METRICS}" | cut -d, -f3)
-        echo "     基线: acc=${BEST_REVIEWER_ACC}, macro_f1=${INIT_MACRO}, nt_rec=${INIT_NT}%"
-        save_best_model  # 初始模型作为第一个 best
+        echo "     当前模型: acc=${INIT_ACC}, macro_f1=${INIT_MACRO}, nt_rec=${INIT_NT}%"
+
+        # 只在没有历史 best 或当前模型更好时才更新 best
+        IS_BETTER=$($PYTHON_EXEC -c "print('1' if float('${INIT_ACC}') > float('${BEST_REVIEWER_ACC}') else '0')")
+        if [ "${IS_BETTER}" = "1" ]; then
+            BEST_REVIEWER_ACC="${INIT_ACC}"
+            echo "     → 设为新 best (${BEST_REVIEWER_ACC})"
+            save_best_model
+        else
+            echo "     → 历史 best 更优 (${BEST_REVIEWER_ACC})，保留"
+        fi
     else
         echo "     ⚠️ 基线评估失败，跳过"
     fi
