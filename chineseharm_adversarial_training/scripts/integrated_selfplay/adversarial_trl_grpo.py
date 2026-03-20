@@ -525,23 +525,7 @@ def main():
         device_map=None,
         trust_remote_code=True,
     )
-
-    # ── LoRA: 只训练少量参数，大幅降低优化器显存 ──
-    from peft import LoraConfig, get_peft_model, TaskType
-    lora_rank = 32 if "3B" in args.model_path or "7B" in args.model_path else 16
-    lora_alpha = lora_rank * 2
-    peft_config = LoraConfig(
-        task_type=TaskType.CAUSAL_LM,
-        r=lora_rank,
-        lora_alpha=lora_alpha,
-        lora_dropout=0.05,
-        target_modules=["q_proj", "k_proj", "v_proj", "o_proj",
-                         "gate_proj", "up_proj", "down_proj"],
-        inference_mode=False,
-    )
-    model = get_peft_model(model, peft_config)
-    model.print_trainable_parameters()
-    print("   ✅ 模型加载完成 (LoRA)")
+    print("   ✅ 模型加载完成")
 
     max_comp_len = args.max_completion_length
     if args.max_completion_length == 256:
@@ -595,14 +579,8 @@ def main():
     print(f"8. 🚀 开始 {args.role} GRPO 更新！")
     trainer.train()
 
-    print("9. [保存] 合并 LoRA → 完整模型（vllm 兼容）...")
-    # 合并 LoRA 权重回基础模型，保存为标准 HF 格式
-    # 这样下一步的 vllm / generate_dynamic_data.py 可以直接加载
-    _save_model = trainer.model
-    if hasattr(_save_model, "merge_and_unload"):
-        _save_model = _save_model.merge_and_unload()
-        print("   ✅ LoRA 已合并到基础模型")
-    _save_model.save_pretrained(args.output_dir)
+    print("9. [保存] 最终模型...")
+    trainer.save_model(args.output_dir)
     tokenizer.save_pretrained(args.output_dir)
 
     # ── 确保 config.json 存在于输出目录根（vllm 下一轮加载必需）──

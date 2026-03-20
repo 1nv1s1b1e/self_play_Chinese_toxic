@@ -59,14 +59,15 @@ SYSTEM_PROMPT = "You are a helpful assistant."
 def build_messages(text: str) -> list[dict]:
     """构造单条样本的对话消息列表"""
     prompt = (
-        '作为中文有毒语言检测专家，请对以下文本进行分析。\n'
-        '有毒类别：性别歧视、种族歧视、地域偏见、LGBTQ歧视、其他仇恨。\n'
-        '注意：隐式仇恨（反讽、暗语、谐音、阴阳怪气）也属有害；'
-        '转述仇恨事件但立场中立的属无害。\n\n'
-        '请严格按以下格式输出：\n'
-        '判断：有害（或：判断：无害）\n'
-        '类别：<类别名>（仅有害时输出）\n\n'
-        f'文本：{text}'
+        '作为中文有毒语言检测专家，请判断以下文本是否包含有毒内容。\n'
+        '请严格按以下格式逐行输出：\n'
+        '第一行：输出"判断：有害"或"判断：无害"\n'
+        '第二行（仅当有害时）：输出"类别："加具体类别名（"性别歧视"、"种族歧视"、"地域偏见"、"LGBTQ歧视"、"其他仇恨"）\n'
+        '第三行（仅当有害时）：输出"毒性类型："加类型（"一般攻击性"或"仇恨言论"）\n'
+        '第四行（仅当有害时）：输出"表达方式："加方式（"显式仇恨"、"隐式仇恨"或"转述"）\n\n'
+        '注意：隐含歧视（如反讽、暗喻、阴阳怪气）也属于有毒内容；转述仇恨事件但本身不有毒的内容应判为无毒。\n\n'
+        f'规则: {rules}\n'
+        f'文本: {text}'
     )
     return [
         {"role": "system", "content": SYSTEM_PROMPT},
@@ -146,7 +147,6 @@ def calculate_metrics(results):
 
     for item in results:
         true_label = item["标签"]
-        all_labels = item.get("all_labels", [true_label])
         pred_label = item["predict_label"]
 
         total += 1
@@ -154,7 +154,7 @@ def calculate_metrics(results):
         if pred_label is None:
             failed_extractions += 1
             label_stats[true_label]['FN'] += 1
-        elif pred_label in all_labels:
+        elif pred_label == true_label:
             correct += 1
             label_stats[true_label]['TP'] += 1
         else:
@@ -304,13 +304,10 @@ def load_eval_data(data_path: str):
         df = pd.read_parquet(data_path)
         data = []
         for _, row in df.iterrows():
-            rec = normalize_record({
+            data.append(normalize_record({
                 "文本": row.get("original_text", row.get("文本", row.get("content", ""))),
                 "标签": row.get("category", row.get("标签", ""))
-            })
-            if "all_labels" in row and row["all_labels"] is not None:
-                rec["all_labels"] = row["all_labels"]
-            data.append(rec)
+            }))
         return data
     elif data_path.endswith('.jsonl'):
         data = []
