@@ -376,23 +376,52 @@ print(f"{acc:.6f},{macro_f1:.6f},{nt_rec:.6f}")
 PY
 }
 
-# Reviewer 评估基线
+# Reviewer 评估基线 — 从历史 eval_history 中恢复真正的最高 acc，避免覆盖 best
 BEST_REVIEWER_ACC="0.0"
-if [ -f "${REVIEWER_EVAL_DATA}" ]; then
-    echo "  ▶ 初始化 Reviewer 评估基线..."
-    mkdir -p "${SELFPLAY_DIR}/eval_init"
-    INIT_METRICS=$(evaluate_reviewer_metrics "${CURRENT_REVIEWER}" "0")
-    if [ "${INIT_METRICS}" != "EVAL_FAILED" ]; then
-        BEST_REVIEWER_ACC=$(echo "${INIT_METRICS}" | cut -d, -f1)
-        INIT_MACRO=$(echo "${INIT_METRICS}" | cut -d, -f2)
-        INIT_NT=$(echo "${INIT_METRICS}" | cut -d, -f3)
-        echo "     基线: acc=${BEST_REVIEWER_ACC}, macro_f1=${INIT_MACRO}, nt_rec=${INIT_NT}%"
-        save_best_model  # 初始模型作为第一个 best
+
+# 先从历史评估记录中找到真正的最高 acc
+if [ -d "${EVAL_HISTORY_DIR}" ]; then
+    HIST_BEST=$($PYTHON_EXEC - "${EVAL_HISTORY_DIR}" <<'HIST_PY'
+import json, glob, sys, os
+best_acc = 0.0
+for f in glob.glob(os.path.join(sys.argv[1], "eval_step*.json")):
+    try:
+        with open(f) as fh:
+            m = json.load(fh).get("metrics", {})
+        acc = float(m.get("overall_accuracy", 0.0))
+        if acc > best_acc:
+            best_acc = acc
+    except Exception:
+        pass
+print(f"{best_acc:.6f}")
+HIST_PY
+    )
+    if [ -n "${HIST_BEST}" ] && [ "${HIST_BEST}" != "0.000000" ]; then
+        BEST_REVIEWER_ACC="${HIST_BEST}"
+        echo "  ▶ 从历史评估恢复 best acc: ${BEST_REVIEWER_ACC}"
+    fi
+fi
+
+# 如果没有历史记录（首次运行），才做初始评估并保存为 best
+if [ "${BEST_REVIEWER_ACC}" = "0.0" ] || [ "${BEST_REVIEWER_ACC}" = "0.000000" ]; then
+    if [ -f "${REVIEWER_EVAL_DATA}" ]; then
+        echo "  ▶ 首次运行，初始化 Reviewer 评估基线..."
+        mkdir -p "${SELFPLAY_DIR}/eval_init"
+        INIT_METRICS=$(evaluate_reviewer_metrics "${CURRENT_REVIEWER}" "0")
+        if [ "${INIT_METRICS}" != "EVAL_FAILED" ]; then
+            BEST_REVIEWER_ACC=$(echo "${INIT_METRICS}" | cut -d, -f1)
+            INIT_MACRO=$(echo "${INIT_METRICS}" | cut -d, -f2)
+            INIT_NT=$(echo "${INIT_METRICS}" | cut -d, -f3)
+            echo "     基线: acc=${BEST_REVIEWER_ACC}, macro_f1=${INIT_MACRO}, nt_rec=${INIT_NT}%"
+            save_best_model
+        else
+            echo "     ⚠️ 基线评估失败，跳过"
+        fi
     else
-        echo "     ⚠️ 基线评估失败，跳过"
+        echo "  ⚠️ 找不到评估集: ${REVIEWER_EVAL_DATA}，跳过评估"
     fi
 else
-    echo "  ⚠️ 找不到评估集: ${REVIEWER_EVAL_DATA}，跳过评估"
+    echo "  ▶ best/ 模型已存在，不覆盖 (历史最优 acc=${BEST_REVIEWER_ACC})"
 fi
 
 # ═════════════════════════════════════════════════════════════════════════════════
