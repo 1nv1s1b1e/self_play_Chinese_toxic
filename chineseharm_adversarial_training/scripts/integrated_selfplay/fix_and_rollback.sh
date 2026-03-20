@@ -71,9 +71,11 @@ echo "  已删除 ${deleted} 个 history 文件"
 echo "[4/6] 清理 metrics.jsonl (保留 step 1-${ROLLBACK_TO})..."
 METRICS="${SP}/metrics.jsonl"
 if [ -f "${METRICS}" ]; then
-    python3 -c "
-import json
-with open('${METRICS}') as f:
+    ROLLBACK_TO=${ROLLBACK_TO} METRICS_PATH="${METRICS}" python3 << 'PYEOF'
+import json, os
+rollback = int(os.environ["ROLLBACK_TO"])
+mpath = os.environ["METRICS_PATH"]
+with open(mpath) as f:
     lines = f.readlines()
 kept = []
 for l in lines:
@@ -81,15 +83,14 @@ for l in lines:
     if not l:
         continue
     try:
-        entry = json.loads(l)
-        if entry.get('step', 999) <= ${ROLLBACK_TO}:
-            kept.append(l + '\n')
+        if json.loads(l).get("step", 999) <= rollback:
+            kept.append(l + "\n")
     except:
         pass
-with open('${METRICS}', 'w') as f:
+with open(mpath, "w") as f:
     f.writelines(kept)
-print(f'  保留 {len(kept)} 条 (step 1-${ROLLBACK_TO})')
-"
+print(f"  保留 {len(kept)} 条 (step 1-{rollback})")
+PYEOF
 else
     echo "  metrics.jsonl 不存在，跳过"
 fi
@@ -98,16 +99,18 @@ fi
 echo "[5/6] 回退 progress.json 到 step ${ROLLBACK_TO}..."
 PROGRESS="${SP}/progress.json"
 if [ -f "${PROGRESS}" ]; then
-    python3 -c "
-import json
-with open('${PROGRESS}') as f:
+    ROLLBACK_TO=${ROLLBACK_TO} PROGRESS_PATH="${PROGRESS}" python3 << 'PYEOF'
+import json, os
+rollback = int(os.environ["ROLLBACK_TO"])
+ppath = os.environ["PROGRESS_PATH"]
+with open(ppath) as f:
     p = json.load(f)
-p['last_completed_step'] = ${ROLLBACK_TO}
-p['last_completed_phase'] = 'done'
-with open('${PROGRESS}', 'w') as f:
+p["last_completed_step"] = rollback
+p["last_completed_phase"] = "done"
+with open(ppath, "w") as f:
     json.dump(p, f, indent=2)
-print(f'  已回退: last_completed_step={ROLLBACK_TO}')
-"
+print(f"  已回退: last_completed_step={rollback}")
+PYEOF
 else
     echo "  progress.json 不存在，跳过"
 fi
