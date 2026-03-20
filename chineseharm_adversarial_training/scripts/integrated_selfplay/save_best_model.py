@@ -162,9 +162,9 @@ def main():
             print("   无法找到模型，退出")
             sys.exit(1)
 
-    # 5. 复制到输出目录
+    # 5. 复制到输出目录（默认就是 best/）
     if not args.output_dir:
-        args.output_dir = os.path.join(args.selfplay_dir, "best_saved")
+        args.output_dir = os.path.join(args.selfplay_dir, "best")
 
     os.makedirs(args.output_dir, exist_ok=True)
 
