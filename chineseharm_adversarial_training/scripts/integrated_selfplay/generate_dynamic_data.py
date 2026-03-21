@@ -517,7 +517,7 @@ def parse_args():
                         help="对跨轮重复错题的额外重采样上限，默认 2")
     parser.add_argument("--history_hard_dir", default="", type=str,
                         help="历史轮次 sample_rewards 目录（用于错题回放），如 selfplay_integrated_data/3B")
-    parser.add_argument("--history_hard_max_rows", default=3000, type=int,
+    parser.add_argument("--history_hard_max_rows", default=200, type=int,
                         help="每轮最多加载的历史错题数，默认 3000")
     return parser.parse_args()
 
@@ -759,16 +759,18 @@ def main():
             "r_reviewer":              sr["r_reviewer"],
         })
 
-    current_hard_count = sum(
-        1 for r in sample_rows
+    # 只提取当前轮的错判样本（不是全部 sample_rows）
+    current_hard_rows = [
+        r for r in sample_rows
         if (not bool(r.get("reviewer_binary_correct", True))) or (not bool(r.get("reviewer_cat_correct", True)))
-    )
+    ]
+    current_hard_count = len(current_hard_rows)
     history_hard_rows = load_history_hard_rows(
         history_dir=args.history_hard_dir,
         current_round=args.round_idx,
         max_rows=args.history_hard_max_rows,
     )
-    total_hard_rows = sample_rows + history_hard_rows
+    total_hard_rows = current_hard_rows + history_hard_rows
 
     # ── Step 7: 构建并保存 parquet ──
     logger.info("\n[Step 7] 构建并保存 GRPO 训练 parquet (Few-Shot Challenger + 1-acc 奖励)...")
