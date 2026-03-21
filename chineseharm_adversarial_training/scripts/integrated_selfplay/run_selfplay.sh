@@ -537,20 +537,42 @@ for STEP in $(seq 1 "${TOTAL_STEPS}"); do
     cleanup_prev_step "${STEP}"
 
     # ── 追加本步指标到 metrics.jsonl ──
-    $PYTHON_EXEC - <<METRICS_PY
-import json, datetime
+    _M_STEP="${STEP}" \
+    _M_ASR="${STEP_ASR:-}" \
+    _M_GEN="${STEP_GEN_COUNT:-}" \
+    _M_ACC="${CAND_ACC:-}" \
+    _M_F1="${CAND_MACRO:-}" \
+    _M_BEST="${BEST_REVIEWER_ACC}" \
+    _M_C="${CURRENT_CHALLENGER}" \
+    _M_R="${CURRENT_REVIEWER}" \
+    _M_LOG="${METRICS_LOG}" \
+    $PYTHON_EXEC << 'METRICS_PY'
+import json, datetime, os
+
+def safe_float(v):
+    try:
+        return float(v) if v else None
+    except (ValueError, TypeError):
+        return None
+
+def safe_int(v):
+    try:
+        return int(v) if v else None
+    except (ValueError, TypeError):
+        return None
+
 entry = {
-    "step": ${STEP},
+    "step": safe_int(os.environ.get("_M_STEP")),
     "timestamp": datetime.datetime.now().isoformat(),
-    "asr": float("${STEP_ASR:-0}") if "${STEP_ASR}" else None,
-    "gen_count": int("${STEP_GEN_COUNT:-0}") if "${STEP_GEN_COUNT}" else None,
-    "reviewer_acc": float("${CAND_ACC:-0}") if "${CAND_ACC:-}" else None,
-    "reviewer_macro_f1": float("${CAND_MACRO:-0}") if "${CAND_MACRO:-}" else None,
-    "best_acc": float("${BEST_REVIEWER_ACC}"),
-    "challenger": "${CURRENT_CHALLENGER}",
-    "reviewer": "${CURRENT_REVIEWER}",
+    "asr": safe_float(os.environ.get("_M_ASR")),
+    "gen_count": safe_int(os.environ.get("_M_GEN")),
+    "reviewer_acc": safe_float(os.environ.get("_M_ACC")),
+    "reviewer_macro_f1": safe_float(os.environ.get("_M_F1")),
+    "best_acc": safe_float(os.environ.get("_M_BEST")),
+    "challenger": os.environ.get("_M_C", ""),
+    "reviewer": os.environ.get("_M_R", ""),
 }
-with open("${METRICS_LOG}", "a") as f:
+with open(os.environ["_M_LOG"], "a") as f:
     f.write(json.dumps(entry, ensure_ascii=False) + "\n")
 METRICS_PY
 

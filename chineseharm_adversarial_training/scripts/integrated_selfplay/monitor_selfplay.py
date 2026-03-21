@@ -243,29 +243,34 @@ def save_snapshot(selfplay_dir: str, data_dir: str, entries: list, step_data: li
     save_dir = os.path.join(selfplay_dir, "monitor_snapshots")
     os.makedirs(save_dir, exist_ok=True)
 
+    import csv as csv_mod
+
     # 1. 保存 metrics CSV（覆盖，始终是最新完整版）
     csv_path = os.path.join(save_dir, "metrics_history.csv")
-    with open(csv_path, "w", encoding="utf-8") as f:
-        f.write("step,asr,reviewer_acc,reviewer_macro_f1,best_acc,timestamp\n")
+    metrics_fields = ["step", "asr", "reviewer_acc", "reviewer_macro_f1", "best_acc", "timestamp"]
+    with open(csv_path, "w", encoding="utf-8", newline="") as f:
+        writer = csv_mod.DictWriter(f, fieldnames=metrics_fields, extrasaction="ignore")
+        writer.writeheader()
         for e in entries:
-            row = [
-                str(e.get("step", "")),
-                str(e.get("asr", "")),
-                str(e.get("reviewer_acc", "")),
-                str(e.get("reviewer_macro_f1", "")),
-                str(e.get("best_acc", "")),
-                str(e.get("timestamp", "")),
-            ]
-            f.write(",".join(row) + "\n")
+            # 只写数值字段，过滤掉路径等非数值内容
+            clean = {
+                "step": e.get("step", ""),
+                "asr": e.get("asr", ""),
+                "reviewer_acc": e.get("reviewer_acc", ""),
+                "reviewer_macro_f1": e.get("reviewer_macro_f1", ""),
+                "best_acc": e.get("best_acc", ""),
+                "timestamp": e.get("timestamp", ""),
+            }
+            writer.writerow(clean)
 
     # 2. 保存每步数据统计 CSV
     data_csv = os.path.join(save_dir, "step_data_history.csv")
-    with open(data_csv, "w", encoding="utf-8") as f:
-        f.write("step,c_rows,r_rows,sr_rows,fooled,cat_fooled,asr\n")
+    data_fields = ["step", "c_rows", "r_rows", "sr_rows", "fooled", "cat_fooled", "asr"]
+    with open(data_csv, "w", encoding="utf-8", newline="") as f:
+        writer = csv_mod.DictWriter(f, fieldnames=data_fields, extrasaction="ignore")
+        writer.writeheader()
         for d in step_data:
-            row = [str(d.get(k, "")) for k in
-                   ["step", "c_rows", "r_rows", "sr_rows", "fooled", "cat_fooled", "asr"]]
-            f.write(",".join(row) + "\n")
+            writer.writerow({k: d.get(k, "") for k in data_fields})
 
     # 3. 保存完整 JSON 快照（带时间戳）
     snapshot = {
