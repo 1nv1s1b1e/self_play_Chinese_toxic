@@ -45,15 +45,15 @@ BASE_DIR="${BASE_DIR:-$(cd "$SCRIPT_DIR/../.." && pwd)}"
 MODEL_SIZE="${MODEL_SIZE:-3B}"
 N_GPUS="${N_GPUS:-4}"
 TOTAL_STEPS="${TOTAL_STEPS:-50}"              # 自对弈总步数
-SAMPLES_PER_CAT="${SAMPLES_PER_CAT:-20}"      # 每类有毒生成样本数 (5有毒类×20=100条)
-NONTOXIC_SAMPLES="${NONTOXIC_SAMPLES:-89}"    # 无毒样本数, 使有毒:无毒≈53:47 匹配 benchmark
+SAMPLES_PER_CAT="${SAMPLES_PER_CAT:-40}"      # 每类有毒生成样本数 (5有毒类×40=200条)
+NONTOXIC_SAMPLES="${NONTOXIC_SAMPLES:-178}"   # 无毒样本数, 使有毒:无毒≈53:47 匹配 benchmark
 GEN_BATCH_SIZE="${GEN_BATCH_SIZE:-4}"
 RESUME="${RESUME:-1}"
 
 CHECK_INTERVAL="${CHECK_INTERVAL:-1}"         # 每 N 步做一次评估检查 (默认每步都评估)
 
 # GRPO 训练: 每个 step 训 1 个 epoch（TRL 自动根据数据量计算步数）
-GRPO_EPOCHS="${GRPO_EPOCHS:-1}"             # 1 epoch/步：避免过拟合当前步数据，靠多步迭代提升
+GRPO_EPOCHS="${GRPO_EPOCHS:-3}"             # 3 epoch/步：1 epoch 仅~6 梯度步，LoRA 学不到足够变化
 
 # Challenger GRPO 超参
 C_LR="${C_LR:-5e-7}"
