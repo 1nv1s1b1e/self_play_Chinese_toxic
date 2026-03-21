@@ -3,10 +3,9 @@
 """
 统一版 Parquet 构建器 — Challenger + Reviewer
 ==============================================
-核心改进 (Few-Shot + 1-acc 版本):
-  - Challenger prompt 含 few-shot 多轮示例（来自种子数据随机采样）
-  - 奖励信号直接使用 reviewer_was_fooled (1-acc)，无 Verifier 依赖
-  - Reviewer parquet 混合原始种子数据，防止分布偏移与灾难性遗忘
+  - Challenger prompt: [system, user] 与 SFT 一致（无 few-shot、无 rules）
+  - 奖励信号: reviewer_was_fooled (1-acc)，无 Verifier 依赖
+  - Reviewer parquet: 对抗样本 + 种子混合 + 困难样本回放
 """
 
 import os, sys
