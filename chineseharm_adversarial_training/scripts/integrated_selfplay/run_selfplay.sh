@@ -309,7 +309,7 @@ run_grpo() {
         local GRAD_ACC="${R_GRAD_ACCUM}"
     fi
 
-    echo "  ▶▶ [$(date +%H:%M:%S)] ${ROLE} GRPO (${GRPO_EPOCHS} epoch, lr=${LR})"
+    echo "  ▶▶ [$(date +%H:%M:%S)] ${ROLE} GRPO (${GRPO_EPOCHS} epoch, lr=${LR}, bs=${PER_BS}, gen=${NUM_GEN}, grad_acc=${GRAD_ACC})"
 
     $PYTHON_EXEC -m torch.distributed.run \
         --nproc_per_node="${N_GPUS}" \
@@ -510,8 +510,7 @@ for STEP in $(seq 1 "${TOTAL_STEPS}"); do
                 CAND_NT=$(echo "${METRICS}" | cut -d, -f3)
                 echo "   📊 结果: acc=${CAND_ACC}, macro_f1=${CAND_MACRO}, nt_recall=${CAND_NT}%"
 
-                # 如果是历史最优，保存到 best/ 并采纳本步模型
-                # 否则丢弃本步结果，下一步从 best 模型继续（面对新数据）
+                # 仅记录最优，不回滚 — 始终用本步模型继续训练
                 IS_BEST=$($PYTHON_EXEC -c "print('1' if float('${CAND_ACC}') > float('${BEST_REVIEWER_ACC}') else '0')")
                 if [ "${IS_BEST}" = "1" ]; then
                     BEST_REVIEWER_ACC="${CAND_ACC}"
@@ -519,9 +518,7 @@ for STEP in $(seq 1 "${TOTAL_STEPS}"); do
                     BEST_REVIEWER_NT_REC="${CAND_NT}"
                     save_best_model
                 else
-                    echo "   ⚠️ 未超过 best (${BEST_REVIEWER_ACC})，丢弃本步，下步从 best 继续"
-                    CURRENT_CHALLENGER="${BEST_DIR}/challenger"
-                    CURRENT_REVIEWER="${BEST_DIR}/reviewer"
+                    echo "   📊 未超过 best (${BEST_REVIEWER_ACC})，继续使用本步模型"
                 fi
             else
                 echo "   ⚠️ 评估失败，跳过"

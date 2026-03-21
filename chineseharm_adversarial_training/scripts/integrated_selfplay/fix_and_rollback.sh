@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# 回滚到 step 23，清理 step 24+ 数据，复制 best_saved → best
+# 回滚到 step 22，从 best_saved/ 重建 step_22 目录
 # 用法:
 #   cd /home/ma-user/work/test/chineseharm_adversarial_training
 #   bash scripts/integrated_selfplay/fix_and_rollback.sh
@@ -13,10 +13,10 @@ BASE_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 SP="${BASE_DIR}/selfplay_integrated/3B_4npu"
 DATA="${BASE_DIR}/selfplay_integrated_data/3B"
 
-ROLLBACK_TO=23
+ROLLBACK_TO=22
 
 echo "============================================================"
-echo "  回滚到 Step ${ROLLBACK_TO}"
+echo "  回滚到 Step ${ROLLBACK_TO} (从 best_saved/ 重建)"
 echo "============================================================"
 echo "  selfplay_dir: ${SP}"
 echo "  data_dir:     ${DATA}"
@@ -28,8 +28,19 @@ if [ ! -d "${SP}" ]; then
     exit 1
 fi
 
-# ── 1. 删除 step 24+ 的模型 ──
-echo "[1/6] 删除 step $((ROLLBACK_TO+1))+ 的模型..."
+# 检查 best_saved 存在
+BEST_SAVED="${SP}/best_saved"
+if [ ! -d "${BEST_SAVED}/challenger" ] || [ ! -d "${BEST_SAVED}/reviewer" ]; then
+    echo "❌ best_saved/ 中缺少 challenger 或 reviewer 模型"
+    echo "   ${BEST_SAVED}/challenger: $([ -d ${BEST_SAVED}/challenger ] && echo '存在' || echo '不存在')"
+    echo "   ${BEST_SAVED}/reviewer:   $([ -d ${BEST_SAVED}/reviewer ] && echo '存在' || echo '不存在')"
+    exit 1
+fi
+echo "✓ best_saved/ 模型确认存在"
+
+# ── 1. 删除 step (ROLLBACK_TO+1)+ 的模型 ──
+echo ""
+echo "[1/7] 删除 step $((ROLLBACK_TO+1))+ 的模型..."
 deleted=0
 for i in $(seq $((ROLLBACK_TO+1)) 100); do
     if [ -d "${SP}/step_${i}" ]; then
@@ -39,8 +50,8 @@ for i in $(seq $((ROLLBACK_TO+1)) 100); do
 done
 echo "  已删除 ${deleted} 个 step 目录"
 
-# ── 2. 删除 step 24+ 的 datagen 数据 ──
-echo "[2/6] 删除 step $((ROLLBACK_TO+1))+ 的 datagen 数据..."
+# ── 2. 删除 step (ROLLBACK_TO+1)+ 的 datagen 数据 ──
+echo "[2/7] 删除 step $((ROLLBACK_TO+1))+ 的 datagen 数据..."
 deleted=0
 for i in $(seq $((ROLLBACK_TO+1)) 100); do
     if [ -d "${DATA}/step_${i}" ]; then
@@ -51,7 +62,7 @@ done
 echo "  已删除 ${deleted} 个 data 目录"
 
 # ── 3. 清理 eval_history 和 datagen_history ──
-echo "[3/6] 清理 history 中 step $((ROLLBACK_TO+1))+ 的文件..."
+echo "[3/7] 清理 history 中 step $((ROLLBACK_TO+1))+ 的文件..."
 deleted=0
 for i in $(seq $((ROLLBACK_TO+1)) 100); do
     for f in \
@@ -68,7 +79,7 @@ done
 echo "  已删除 ${deleted} 个 history 文件"
 
 # ── 4. 清理 metrics.jsonl ──
-echo "[4/6] 清理 metrics.jsonl (保留 step 1-${ROLLBACK_TO})..."
+echo "[4/7] 清理 metrics.jsonl (保留 step 1-${ROLLBACK_TO})..."
 METRICS="${SP}/metrics.jsonl"
 if [ -f "${METRICS}" ]; then
     ROLLBACK_TO=${ROLLBACK_TO} METRICS_PATH="${METRICS}" python3 << 'PYEOF'
@@ -95,71 +106,95 @@ else
     echo "  metrics.jsonl 不存在，跳过"
 fi
 
-# ── 5. 回退 progress.json ──
-echo "[5/6] 回退 progress.json 到 step ${ROLLBACK_TO}..."
-PROGRESS="${SP}/progress.json"
-if [ -f "${PROGRESS}" ]; then
-    ROLLBACK_TO=${ROLLBACK_TO} PROGRESS_PATH="${PROGRESS}" python3 << 'PYEOF'
-import json, os
-rollback = int(os.environ["ROLLBACK_TO"])
-ppath = os.environ["PROGRESS_PATH"]
-with open(ppath) as f:
-    p = json.load(f)
-p["last_completed_step"] = rollback
-p["last_completed_phase"] = "done"
-with open(ppath, "w") as f:
-    json.dump(p, f, indent=2)
-print(f"  已回退: last_completed_step={rollback}")
-PYEOF
-else
-    echo "  progress.json 不存在，跳过"
-fi
+# ── 5. 从 best_saved/ 重建 step_22 目录 ──
+echo "[5/7] 从 best_saved/ 重建 step_${ROLLBACK_TO}/ ..."
+STEP_DIR="${SP}/step_${ROLLBACK_TO}"
+rm -rf "${STEP_DIR}" 2>/dev/null || true
+mkdir -p "${STEP_DIR}"
 
-# ── 6. 复制 best_saved → best ──
-echo "[6/6] 复制 best_saved/ → best/..."
-BEST_SAVED="${SP}/best_saved"
-BEST="${SP}/best"
+cp -r "${BEST_SAVED}/challenger" "${STEP_DIR}/challenger"
+cp -r "${BEST_SAVED}/reviewer"   "${STEP_DIR}/reviewer"
+echo "  ✓ ${STEP_DIR}/challenger"
+echo "  ✓ ${STEP_DIR}/reviewer"
 
-if [ -d "${BEST_SAVED}/challenger" ] && [ -d "${BEST_SAVED}/reviewer" ]; then
-    rm -rf "${BEST}/challenger" "${BEST}/reviewer"
-    cp -r "${BEST_SAVED}/challenger" "${BEST}/challenger"
-    cp -r "${BEST_SAVED}/reviewer" "${BEST}/reviewer"
-    # 复制 best_info.json 中的 step 到 best_step.txt
-    if [ -f "${BEST_SAVED}/best_info.json" ]; then
-        cp "${BEST_SAVED}/best_info.json" "${BEST}/best_info.json"
-        python3 -c "
-import json
-with open('${BEST_SAVED}/best_info.json') as f:
-    info = json.load(f)
-step = info.get('step', '?')
-acc = info.get('acc', '?')
-with open('${BEST}/best_step.txt', 'w') as f:
-    f.write(str(step))
-print(f'  best 模型来自 step {step} (acc={acc}%)')
-"
-    fi
-    echo "  ✓ best_saved/ 已复制到 best/"
-else
-    echo "  ⚠️ best_saved/ 中没有模型，尝试保留现有 best/"
-    if [ -d "${BEST}/challenger" ]; then
-        echo "  现有 best/ 保留不动"
+# ── 5b. 补全 config.json（DeepSpeed 保存时可能缺失，vLLM 必需）──
+CHALLENGER_INIT="${BASE_DIR}/merged_models_toxicn/challenger_3B"
+REVIEWER_INIT="${BASE_DIR}/merged_models_toxicn/reviewer_3B"
+
+for role_dir in "${STEP_DIR}/challenger" "${STEP_DIR}/reviewer"; do
+    if [ "${role_dir}" = "${STEP_DIR}/challenger" ]; then
+        INIT_DIR="${CHALLENGER_INIT}"
     else
-        echo "  ❌ 没有可用的 best 模型"
+        INIT_DIR="${REVIEWER_INIT}"
     fi
+    for fname in config.json generation_config.json tokenizer_config.json tokenizer.json special_tokens_map.json; do
+        if [ ! -f "${role_dir}/${fname}" ] && [ -f "${INIT_DIR}/${fname}" ]; then
+            cp "${INIT_DIR}/${fname}" "${role_dir}/${fname}"
+            echo "  ✓ 补全 ${role_dir##*/}/${fname}"
+        fi
+    done
+done
+
+# ── 6. 复制 best_saved/ → best/ ──
+echo "[6/7] 复制 best_saved/ → best/ ..."
+BEST="${SP}/best"
+rm -rf "${BEST}/challenger" "${BEST}/reviewer" 2>/dev/null || true
+mkdir -p "${BEST}"
+
+cp -r "${STEP_DIR}/challenger" "${BEST}/challenger"
+cp -r "${STEP_DIR}/reviewer"   "${BEST}/reviewer"
+echo "${ROLLBACK_TO}" > "${BEST}/best_step.txt"
+
+if [ -f "${BEST_SAVED}/best_info.json" ]; then
+    cp "${BEST_SAVED}/best_info.json" "${BEST}/best_info.json"
 fi
+echo "  ✓ best/ 已同步"
+
+# ── 7. 回退 progress.json + latest/ ──
+echo "[7/7] 更新 progress.json 和 latest/ ..."
+PROGRESS="${SP}/progress.json"
+STEP_C="${STEP_DIR}/challenger"
+STEP_R="${STEP_DIR}/reviewer"
+
+cat > "${PROGRESS}" << PEOF
+{
+  "last_completed_step": ${ROLLBACK_TO},
+  "last_completed_phase": "done",
+  "total_steps": 50,
+  "current_challenger": "${STEP_C}",
+  "current_reviewer": "${STEP_R}",
+  "timestamp": "$(date -Iseconds)"
+}
+PEOF
+echo "  ✓ progress.json → step ${ROLLBACK_TO}"
+
+LATEST="${SP}/latest"
+mkdir -p "${LATEST}"
+cat > "${LATEST}/latest_paths.json" << LEOF
+{
+  "step": ${ROLLBACK_TO},
+  "timestamp": "$(date -Iseconds)",
+  "challenger": "${STEP_C}",
+  "reviewer": "${STEP_R}"
+}
+LEOF
+echo "${ROLLBACK_TO}" > "${LATEST}/latest_step.txt"
+echo "${STEP_C}" > "${LATEST}/challenger_latest.txt"
+echo "${STEP_R}" > "${LATEST}/reviewer_latest.txt"
+echo "  ✓ latest/ 已更新"
 
 # ── 确认 ──
 echo ""
 echo "============================================================"
-echo "  回滚完成"
+echo "  回滚完成 → Step ${ROLLBACK_TO}"
 echo "============================================================"
-if [ -f "${PROGRESS}" ]; then
-    echo "  progress: step $(python3 -c "import json; print(json.load(open('${PROGRESS}'))['last_completed_step'])")"
-fi
+echo "  step_${ROLLBACK_TO}/challenger: $(ls "${STEP_DIR}/challenger/config.json" 2>/dev/null && echo '✓' || echo '⚠️ 无 config.json')"
+echo "  step_${ROLLBACK_TO}/reviewer:   $(ls "${STEP_DIR}/reviewer/config.json" 2>/dev/null && echo '✓' || echo '⚠️ 无 config.json')"
+echo "  best/:          $(ls "${BEST}/" 2>/dev/null | tr '\n' ' ')"
+echo "  progress:       step $(python3 -c "import json; print(json.load(open('${PROGRESS}'))['last_completed_step'])")"
 if [ -f "${METRICS}" ]; then
-    echo "  metrics:  $(wc -l < "${METRICS}") 条"
+    echo "  metrics.jsonl:  $(wc -l < "${METRICS}") 条"
 fi
-echo "  best/:    $(ls "${BEST}/" 2>/dev/null | tr '\n' ' ')"
-echo "  eval_history: $(ls "${SP}/eval_history/" 2>/dev/null | wc -l) 个文件"
+echo "  eval_history:   $(ls "${SP}/eval_history/" 2>/dev/null | wc -l) 个文件"
 echo ""
-echo "下一步: RESUME=1 MODEL_SIZE=3B N_GPUS=4 bash scripts/integrated_selfplay/run_selfplay.sh"
+echo "下一步: RESUME=1 bash scripts/integrated_selfplay/run_selfplay.sh"
