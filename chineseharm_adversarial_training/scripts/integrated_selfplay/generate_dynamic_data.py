@@ -517,7 +517,7 @@ def parse_args():
                         help="对跨轮重复错题的额外重采样上限，默认 2")
     parser.add_argument("--history_hard_dir", default="", type=str,
                         help="历史轮次 sample_rewards 目录（用于错题回放），如 selfplay_integrated_data/3B")
-    parser.add_argument("--history_hard_max_rows", default=500, type=int,
+    parser.add_argument("--history_hard_max_rows", default=1000, type=int,
                         help="每轮最多加载的历史错题数，默认 3000")
     return parser.parse_args()
 
