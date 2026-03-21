@@ -55,19 +55,25 @@ CHECK_INTERVAL="${CHECK_INTERVAL:-1}"         # 每 N 步做一次评估检查 (
 # GRPO 训练: 每个 step 训 1 个 epoch（TRL 自动根据数据量计算步数）
 GRPO_EPOCHS="${GRPO_EPOCHS:-1}"             # 1 epoch/步：避免过拟合当前步数据，靠多步迭代提升
 
-# Challenger GRPO 超参
-C_LR="${C_LR:-5e-7}"
-C_PER_DEVICE_BS="${C_PER_DEVICE_BS:-2}"
+# Challenger/Reviewer GRPO 超参 — 按模型大小自动适配
+case "${MODEL_SIZE}" in
+    "0.5B"|"1.5B"|"3B")
+        C_LR="${C_LR:-5e-7}";  C_PER_DEVICE_BS="${C_PER_DEVICE_BS:-2}";  C_GRAD_ACCUM="${C_GRAD_ACCUM:-4}"
+        R_LR="${R_LR:-5e-7}";  R_PER_DEVICE_BS="${R_PER_DEVICE_BS:-4}";  R_GRAD_ACCUM="${R_GRAD_ACCUM:-4}"
+        ;;
+    "7B")
+        C_LR="${C_LR:-3e-7}";  C_PER_DEVICE_BS="${C_PER_DEVICE_BS:-1}";  C_GRAD_ACCUM="${C_GRAD_ACCUM:-8}"
+        R_LR="${R_LR:-3e-7}";  R_PER_DEVICE_BS="${R_PER_DEVICE_BS:-2}";  R_GRAD_ACCUM="${R_GRAD_ACCUM:-8}"
+        ;;
+    *)
+        C_LR="${C_LR:-2e-7}";  C_PER_DEVICE_BS="${C_PER_DEVICE_BS:-1}";  C_GRAD_ACCUM="${C_GRAD_ACCUM:-8}"
+        R_LR="${R_LR:-2e-7}";  R_PER_DEVICE_BS="${R_PER_DEVICE_BS:-1}";  R_GRAD_ACCUM="${R_GRAD_ACCUM:-8}"
+        ;;
+esac
 C_NUM_GEN="${C_NUM_GEN:-4}"
 C_MAX_COMP_LEN="${C_MAX_COMP_LEN:-128}"
-C_GRAD_ACCUM="${C_GRAD_ACCUM:-4}"
-
-# Reviewer GRPO 超参
-R_LR="${R_LR:-5e-7}"
-R_PER_DEVICE_BS="${R_PER_DEVICE_BS:-4}"
 R_NUM_GEN="${R_NUM_GEN:-4}"
 R_MAX_COMP_LEN="${R_MAX_COMP_LEN:-64}"
-R_GRAD_ACCUM="${R_GRAD_ACCUM:-4}"
 
 # 在线 Reviewer 推理 batch size (Challenger GRPO 用)
 REVIEWER_BATCH_SIZE="${REVIEWER_BATCH_SIZE:-8}"
@@ -469,8 +475,19 @@ for STEP in $(seq 1 "${TOTAL_STEPS}"); do
     if [ -z "${RESUME_SKIP_PHASE}" ] || [ "${RESUME_SKIP_PHASE}" \< "challenger" ]; then
         echo ""
         echo "── Challenger GRPO (Step ${STEP}) ──"
-        # LoRA 训练下显存充足，启用在线 Reviewer 实时评估每条新 completion
-        # 这样 GRPO 的 K 条 completion 得到不同 reward → 有效的 advantage 信号
+        # 根据模型大小决定是否启用在线 Reviewer:
+        #   ≤3B: 两个模型放得下，启用在线 Reviewer（实时 1-acc 信号）
+        #   ≥7B: 放不下两个模型，使用 datagen 阶段预计算的静态信号
+        CHALLENGER_REVIEWER_ARG=""
+        case "${MODEL_SIZE}" in
+            "0.5B"|"1.5B"|"3B")
+                CHALLENGER_REVIEWER_ARG="${CURRENT_REVIEWER}"
+                echo "  (在线 Reviewer: 启用)"
+                ;;
+            *)
+                echo "  (在线 Reviewer: 关闭 — ${MODEL_SIZE} 模型过大，使用静态信号)"
+                ;;
+        esac
         run_grpo \
             "challenger" \
             "${CURRENT_CHALLENGER}" \
@@ -478,7 +495,7 @@ for STEP in $(seq 1 "${TOTAL_STEPS}"); do
             "${STEP_DIR}/challenger" \
             "${LOG_DIR}/step${STEP}_challenger_$(date +%Y%m%d_%H%M%S).log" \
             "29600" \
-            "${CURRENT_REVIEWER}"
+            "${CHALLENGER_REVIEWER_ARG}"
 
         CURRENT_CHALLENGER="${STEP_DIR}/challenger"
         save_progress "${STEP}" "challenger"
