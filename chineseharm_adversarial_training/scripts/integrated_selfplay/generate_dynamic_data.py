@@ -522,8 +522,13 @@ def parse_args():
     return parser.parse_args()
 
 
-def load_history_hard_rows(history_dir: str, current_round: int, max_rows: int) -> List[Dict]:
-    """从历史轮次 sample_rewards parquet 加载 Reviewer 错判样本。"""
+def load_history_hard_rows(history_dir: str, current_round: int, max_rows: int,
+                          recent_k: int = 5) -> List[Dict]:
+    """从最近 K 轮的 sample_rewards parquet 加载 Reviewer 错判样本。
+
+    只回放最近 recent_k 轮的错题，更早的错题大概率已被 Reviewer 学会，
+    继续回放只会浪费训练容量。
+    """
     if not history_dir:
         return []
 
@@ -532,13 +537,16 @@ def load_history_hard_rows(history_dir: str, current_round: int, max_rows: int) 
         logger.warning(f"历史错题目录不存在，跳过: {history_dir}")
         return []
 
+    # 只加载最近 recent_k 轮
+    min_round = max(1, current_round - recent_k)
+
     all_rows: List[Dict] = []
-    for p in sorted(base.glob("round_*/sample_rewards_round*.parquet")):
+    for p in sorted(base.glob("step_*/sample_rewards_round*.parquet")):
         m = re.search(r"round(\d+)", p.stem)
         if not m:
             continue
         round_idx = int(m.group(1))
-        if round_idx >= current_round:
+        if round_idx >= current_round or round_idx < min_round:
             continue
 
         try:
@@ -559,6 +567,7 @@ def load_history_hard_rows(history_dir: str, current_round: int, max_rows: int) 
     if max_rows > 0 and len(all_rows) > max_rows:
         all_rows = random.sample(all_rows, max_rows)
 
+    logger.info(f"   历史错题: 加载 round {min_round}-{current_round-1}, 共 {len(all_rows)} 条 (上限 {max_rows})")
     return all_rows
 
 
