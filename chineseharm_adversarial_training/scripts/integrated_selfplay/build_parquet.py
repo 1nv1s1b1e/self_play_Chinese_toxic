@@ -77,7 +77,6 @@ def build_challenger_parquet(
                 "expression":         task.get("expression", ""),
                 "toxic_type":         task.get("toxic_type", ""),
                 "original_text":      task.get("reference_anchor", ""),
-                "few_shot_example":   few_shot,
 
                 # ── 多级对抗信号 ──
                 "reviewer_fooled":     bool(reviewer_fooled),
